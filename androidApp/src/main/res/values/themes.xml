@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Sproutelle" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/sproutelle_cream</item>
+        <item name="android:colorBackground">@color/sproutelle_cream</item>
+        <item name="windowSplashScreenBackground">@color/sproutelle_cream</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/sproutelle_launch_icon</item>
+        <item name="postSplashScreenTheme">@style/Theme.Sproutelle</item>
+    </style>
+</resources>
