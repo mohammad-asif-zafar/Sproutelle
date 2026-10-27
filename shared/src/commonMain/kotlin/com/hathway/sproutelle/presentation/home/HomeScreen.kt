@@ -23,7 +23,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -33,7 +32,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,10 +49,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.hathway.sproutelle.core.responsive.ProvideWindowSizeClass
-import com.hathway.sproutelle.domain.model.ActivityItem
 import com.hathway.sproutelle.domain.model.ExplorerItem
 import com.hathway.sproutelle.domain.model.HomeData
-import com.hathway.sproutelle.domain.model.PlantItem
 import org.jetbrains.compose.resources.painterResource
 import sproutelle.shared.generated.resources.Res
 import sproutelle.shared.generated.resources.sproutelle_home_landscape
@@ -62,12 +59,13 @@ import theme.SproutelleColors
 import theme.SproutelleDimens
 import theme.SproutelleShapes
 import theme.SproutelleSpacing
+import theme.SproutelleTheme
 
 @Composable
 fun HomeScreen(viewModel: HomeViewModel) {
-    val uiState by viewModel.uiState.collectAsState()
-    val explorerItems by viewModel.explorerItems.collectAsState()
-    val explorerError by viewModel.explorerError.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val explorerItems by viewModel.explorerItems.collectAsStateWithLifecycle()
+    val explorerError by viewModel.explorerError.collectAsStateWithLifecycle()
 
     ProvideWindowSizeClass { windowSize ->
         Surface(
@@ -147,7 +145,7 @@ private fun PhoneHomeContent(
                 containerColor = SproutelleColors.White,
                 contentColor = SproutelleColors.Ink
             ) {
-                val navItems = listOf("Home" to "🏠", "Games" to "🎮", "Rewards" to "⭐", "Profile" to "👤")
+                val navItems = listOf("Home" to "🏠", "Games" to "🎮", "Progress" to "📊", "Profile" to "👤")
                 navItems.forEachIndexed { index, item ->
                     NavigationBarItem(
                         selected = selectedTab == index,
@@ -168,74 +166,88 @@ private fun PhoneHomeContent(
             verticalArrangement = Arrangement.spacedBy(SproutelleSpacing.Section)
         ) {
             item {
-                // Portrait Hero Header Background Card for Mobile
+                // Top Header: Logo left, Parent button right
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("🌱", fontSize = 26.sp)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Sproutelle",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = SproutelleColors.LeafGreen,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Card(
+                        shape = SproutelleShapes.Pill,
+                        colors = CardDefaults.cardColors(containerColor = SproutelleColors.White),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text("👤", fontSize = 14.sp)
+                            Text(
+                                text = "Parent",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = SproutelleColors.Ink,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+
+            item {
+                // Garden Hero Banner
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(200.dp),
+                        .height(170.dp),
                     shape = SproutelleShapes.Large,
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                    elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
                 ) {
                     Box(modifier = Modifier.fillMaxSize()) {
                         Image(
                             painter = painterResource(Res.drawable.sproutelle_home_portrait),
-                            contentDescription = "Home Portrait Background",
+                            contentDescription = "Garden Hero",
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop
                         )
-                        Column(
+                        Row(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .padding(SproutelleSpacing.Large),
-                            verticalArrangement = Arrangement.SpaceBetween
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                            Box(
+                                modifier = Modifier
+                                    .size(52.dp)
+                                    .background(SproutelleColors.White, shape = CircleShape),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(44.dp)
-                                            .background(SproutelleColors.White, shape = CircleShape),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text("👧", fontSize = 24.sp)
-                                    }
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Column {
-                                        Text(
-                                            text = "Hello,",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = SproutelleColors.SecondaryText
-                                        )
-                                        Text(
-                                            text = "${data.userName}!",
-                                            style = MaterialTheme.typography.titleLarge,
-                                            color = SproutelleColors.Ink,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                }
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(36.dp)
-                                            .background(SproutelleColors.White, shape = CircleShape),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text("🔔", fontSize = 16.sp)
-                                    }
-                                    Box(
-                                        modifier = Modifier
-                                            .size(36.dp)
-                                            .background(SproutelleColors.White, shape = CircleShape),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text("⚙️", fontSize = 16.sp)
-                                    }
-                                }
+                                Text("👧", fontSize = 28.sp)
+                            }
+                            Column {
+                                Text(
+                                    text = "Good Morning,",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = SproutelleColors.SecondaryText
+                                )
+                                Text(
+                                    text = if (data.userName.isNotBlank()) "${data.userName}!" else "Little Gardener!",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    color = SproutelleColors.Ink,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
                         }
                     }
@@ -305,8 +317,8 @@ private fun PhoneHomeContent(
                 }
 
                 Spacer(modifier = Modifier.height(SproutelleSpacing.Medium))
-                // Exactly two columns on phone, using safe row-chunked layout without clipping
-                CategoriesGrid(items = explorerItems, columns = 2)
+                // Two-column vertical category cards grid for phone matching reference image 2 exactly
+                CategoriesGrid(items = explorerItems, columns = 2, isTablet = false)
             }
         }
     }
@@ -357,50 +369,88 @@ private fun TabletHomeContent(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(SproutelleDimens.TabletContentPadding),
-            verticalArrangement = Arrangement.spacedBy(SproutelleSpacing.Large)
+            verticalArrangement = Arrangement.spacedBy(SproutelleSpacing.Section)
         ) {
             item {
-                // Top Bar with Sproutelle Branding and Parent button
+                // Top Header: Logo left, Parent button right
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("🌱", fontSize = 28.sp)
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("🌱", fontSize = 30.sp)
+                        Spacer(modifier = Modifier.width(10.dp))
                         Text(
                             text = "Sproutelle",
-                            style = MaterialTheme.typography.headlineLarge,
+                            style = MaterialTheme.typography.headlineMedium,
                             color = SproutelleColors.LeafGreen,
                             fontWeight = FontWeight.Bold
                         )
                     }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .background(SproutelleColors.White, shape = CircleShape),
-                            contentAlignment = Alignment.Center
+                    Card(
+                        shape = SproutelleShapes.Pill,
+                        colors = CardDefaults.cardColors(containerColor = SproutelleColors.White),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text("🔍", fontSize = 18.sp)
+                            Text("👤", fontSize = 16.sp)
+                            Text(
+                                text = "Parent",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = SproutelleColors.Ink,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
+                    }
+                }
+            }
 
-                        Card(
-                            shape = SproutelleShapes.Pill,
-                            colors = CardDefaults.cardColors(containerColor = SproutelleColors.White),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            item {
+                // Landscape Garden Hero Banner for Tablet matching reference
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(220.dp),
+                    shape = SproutelleShapes.Large,
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                ) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        Image(
+                            painter = painterResource(Res.drawable.sproutelle_home_landscape),
+                            contentDescription = "Garden Hero Landscape",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(SproutelleSpacing.Large),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(18.dp)
                         ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            Box(
+                                modifier = Modifier
+                                    .size(64.dp)
+                                    .background(SproutelleColors.White, shape = CircleShape),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Text("👤", fontSize = 16.sp)
+                                Text("👧", fontSize = 36.sp)
+                            }
+                            Column {
                                 Text(
-                                    text = "Parent",
-                                    style = MaterialTheme.typography.titleMedium,
+                                    text = "Good Morning,",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = SproutelleColors.SecondaryText
+                                )
+                                Text(
+                                    text = "${data.userName}!",
+                                    style = MaterialTheme.typography.headlineMedium,
                                     color = SproutelleColors.Ink,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -411,66 +461,15 @@ private fun TabletHomeContent(
             }
 
             item {
-                // Landscape Hero Banner Image for Tablet matching design reference
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(240.dp),
-                    shape = SproutelleShapes.Large,
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-                ) {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        Image(
-                            painter = painterResource(Res.drawable.sproutelle_home_landscape),
-                            contentDescription = "Cheerful Lakeside Explorer Meadow",
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
-                        )
-                        Row(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(SproutelleSpacing.Large),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(56.dp)
-                                        .background(SproutelleColors.White, shape = CircleShape),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text("👧", fontSize = 32.sp)
-                                }
-                                Spacer(modifier = Modifier.width(16.dp))
-                                Column {
-                                    Text(
-                                        text = "Good Morning,",
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = SproutelleColors.SecondaryText
-                                    )
-                                    Text(
-                                        text = "${data.userName}!",
-                                        style = MaterialTheme.typography.headlineLarge,
-                                        color = SproutelleColors.Ink,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(SproutelleSpacing.Large),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(modifier = Modifier.width(360.dp)) {
-                        HeaderGreetingCard(data = data)
-                    }
+                Text(
+                    text = "Continue Playing",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = SproutelleColors.Ink,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(SproutelleSpacing.Medium))
+                Box(modifier = Modifier.fillMaxWidth(0.5f)) {
+                    HeaderGreetingCard(data = data)
                 }
             }
 
@@ -524,11 +523,10 @@ private fun TabletHomeContent(
                         }
                     }
                 }
-            }
 
-            item {
-                // Responsive multi-column grid for tablet (4 columns), safe row-chunked layout without clipping
-                CategoriesGrid(items = explorerItems, columns = 4)
+                Spacer(modifier = Modifier.height(SproutelleSpacing.Medium))
+                // Three-column grid of wide horizontal cards matching reference image 3 for tablet
+                CategoriesGrid(items = explorerItems, columns = 3, isTablet = true)
             }
         }
     }
@@ -592,7 +590,7 @@ private fun HeaderGreetingCard(data: HomeData) {
 }
 
 @Composable
-private fun CategoriesGrid(items: List<ExplorerItem>, columns: Int) {
+private fun CategoriesGrid(items: List<ExplorerItem>, columns: Int, isTablet: Boolean) {
     if (items.isEmpty()) {
         Box(
             modifier = Modifier
@@ -621,7 +619,7 @@ private fun CategoriesGrid(items: List<ExplorerItem>, columns: Int) {
             ) {
                 rowItems.forEach { item ->
                     Box(modifier = Modifier.weight(1f)) {
-                        CategoryCard(item = item)
+                        CategoryCard(item = item, isTablet = isTablet)
                     }
                 }
                 // If last row has fewer items, pad with invisible spacers
@@ -634,77 +632,202 @@ private fun CategoriesGrid(items: List<ExplorerItem>, columns: Int) {
 }
 
 @Composable
-private fun CategoryCard(item: ExplorerItem) {
+private fun CategoryCard(item: ExplorerItem, isTablet: Boolean) {
     val bgColor = parseColorHex(item.backgroundColor)
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = bgColor),
-        shape = SproutelleShapes.Large,
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(
+    if (isTablet) {
+        // Tablet: Wide horizontal card (Reference Image 3)
+        Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 20.dp, horizontal = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+                .height(128.dp),
+            colors = CardDefaults.cardColors(containerColor = bgColor),
+            shape = SproutelleShapes.Large,
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
-            Box(
+            Row(
                 modifier = Modifier
-                    .size(52.dp)
-                    .background(SproutelleColors.White.copy(alpha = 0.6f), shape = CircleShape),
-                contentAlignment = Alignment.Center
+                    .fillMaxSize()
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                var isError by remember { mutableStateOf(false) }
+                CategoryIcon(item = item, size = 170.dp)
 
-                if (!item.imageUrl.isNullOrBlank() && !isError) {
-                    AsyncImage(
-                        model = item.imageUrl,
-                        contentDescription = item.titleName,
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(CircleShape),
-                        contentScale = ContentScale.Crop,
-                        onLoading = {
-                            println("SproutelleImage: Loading image for '${item.titleName}'")
-                        },
-                        onSuccess = {
-                            println("SproutelleImage: Successfully loaded image for '${item.titleName}'")
-                        },
-                        onError = { state ->
-                            val cause = state.result.throwable
-                            println("SproutelleImageError: Failed to load image for '${item.titleName}': ${cause::class.simpleName} - ${cause.message}")
-                            isError = true
-                        }
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(vertical = 2.dp),
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = item.titleName,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = SproutelleColors.Ink,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
                     )
+
+                    val description = getCategoryDescription(item.titleName)
+                    if (description.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(3.dp))
+                        Text(
+                            text = description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = SproutelleColors.SecondaryText,
+                            maxLines = 2,
+                            lineHeight = 15.sp
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Surface(
+                        shape = SproutelleShapes.Pill,
+                        color = Color(0xFFFFEAD0)
+                    ) {
+                        Text(
+                            text = "Ages 3–8",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFFB35900),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        )
+                    }
                 }
 
-                if (item.imageUrl.isNullOrBlank() || isError) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(SproutelleColors.White, shape = CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
                     Text(
-                        text = when (item.titleName.lowercase()) {
-                            "letters" -> "A"
-                            "numbers" -> "123"
-                            "animals" -> "🦁"
-                            "shapes" -> "🔺"
-                            "colours", "colors" -> "🎨"
-                            "creativity" -> "✨"
-                            else -> "🌟"
-                        },
-                        fontSize = 26.sp
+                        text = "›",
+                        color = SproutelleColors.Ink,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 22.sp
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(10.dp))
-            Text(
-                text = item.titleName,
-                style = MaterialTheme.typography.titleMedium,
-                color = SproutelleColors.Ink,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                maxLines = 2
-            )
         }
+    } else {
+        // Phone: Vertical card matching Reference Image 2 perfectly (illustration top, title, ages badge, arrow)
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(175.dp),
+            colors = CardDefaults.cardColors(containerColor = bgColor),
+            shape = SproutelleShapes.Large,
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                // Top: Illustration tile in rounded white container
+                CategoryIcon(item = item, size = 100.dp)
+
+                // Middle: Title (max 2 lines, centered)
+                Text(
+                    text = item.titleName,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = SproutelleColors.Ink,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    lineHeight = 16.sp
+                )
+
+                // Bottom: Ages 3-8 badge and arrow button in a row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        shape = SproutelleShapes.Pill,
+                        color = Color(0xFFFFEAD0)
+                    ) {
+                        Text(
+                            text = "Ages 3–8",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFFB35900),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .background(SproutelleColors.White, shape = CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "›",
+                            color = SproutelleColors.Ink,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CategoryIcon(item: ExplorerItem, size: androidx.compose.ui.unit.Dp) {
+    var isError by remember { mutableStateOf(false) }
+
+    if (!item.imageUrl.isNullOrBlank() && !isError) {
+        AsyncImage(
+            model = item.imageUrl,
+            contentDescription = item.titleName,
+            modifier = Modifier
+                .size(size)
+                .clip(RoundedCornerShape(12.dp)),
+            contentScale = ContentScale.Fit,
+            onError = { isError = true }
+        )
+    }
+
+    if (item.imageUrl.isNullOrBlank() || isError) {
+        Text(
+            text = when (item.titleName.lowercase()) {
+                "letters", "letters & reading" -> "ABC"
+                "numbers", "numbers & maths" -> "123"
+                "animals", "animals & nature" -> "🦁"
+                "shapes", "shapes & colours" -> "🎨"
+                "colours", "colors" -> "🎨"
+                "creativity", "creative studio" -> "✨"
+                else -> "🌟"
+            },
+            fontSize = (size.value * 0.4f).sp
+        )
+    }
+}
+
+private fun getCategoryDescription(title: String): String {
+    return when (title.lowercase()) {
+        "numbers & maths" -> "Counting, number sense, early arithmetic and patterns"
+        "letters & reading" -> "Alphabet, phonics, vocabulary and early reading"
+        "animals & nature" -> "Animal knowledge, natural environments and living things"
+        "shapes & colours" -> "Visual recognition, classification and patterns"
+        "creative studio" -> "Drawing, colouring, creating and imaginative play"
+        "everyday world" -> "Familiar objects, daily routines and the world around us"
+        "memory & logic" -> "Memory, reasoning, classification and sequences"
+        "music & sounds" -> "Listening, sound recognition, rhythm and musical exploration"
+        "puzzles & thinking" -> "Spatial reasoning, spatial problem-solving and puzzle challenges"
+        "science & discovery" -> "Nature, simple scientific concepts and curiosity-led learning"
+        "social & emotional skills" -> "Emotions, empathy, friendship and everyday independence"
+        "languages" -> "Vocabulary, listening, pronunciation and bilingual learning"
+        else -> "Fun interactive learning for kids"
     }
 }
 
@@ -719,5 +842,70 @@ private fun parseColorHex(hex: String): Color {
         }
     } catch (e: Exception) {
         SproutelleColors.Peach
+    }
+}
+
+// ==================== COMPOSE PREVIEWS ====================
+
+@Preview(showBackground = true, backgroundColor = 0xFFFFF8E8, name = "Category Card - Phone")
+@Composable
+private fun CategoryCardPhonePreview() {
+    SproutelleTheme {
+        Box(modifier = Modifier.padding(16.dp).width(180.dp)) {
+            CategoryCard(
+                item = ExplorerItem(
+                    id = "1",
+                    titleName = "Everyday World",
+                    titleImageAssetId = null,
+                    backgroundColor = "#E6F7E8",
+                    categoryId = "cat_1",
+                    sortOrder = 1,
+                    isActive = true,
+                    imageUrl = null
+                ),
+                isTablet = false
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFFFFF8E8, name = "Category Card - Tablet")
+@Composable
+private fun CategoryCardTabletPreview() {
+    SproutelleTheme {
+        Box(modifier = Modifier.padding(16.dp).width(360.dp)) {
+            CategoryCard(
+                item = ExplorerItem(
+                    id = "1",
+                    titleName = "Everyday World",
+                    titleImageAssetId = null,
+                    backgroundColor = "#E6F7E8",
+                    categoryId = "cat_1",
+                    sortOrder = 1,
+                    isActive = true,
+                    imageUrl = null
+                ),
+                isTablet = true
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFFFFF8E8, name = "Continue Playing Card")
+@Composable
+private fun HeaderGreetingCardPreview() {
+    SproutelleTheme {
+        Box(modifier = Modifier.padding(16.dp).width(400.dp)) {
+            HeaderGreetingCard(
+                data = HomeData(
+                    userName = "Emma",
+                    greetingMessage = "Good Morning",
+                    streakDays = 5,
+                    activePlants = emptyList(),
+                    categories = emptyList(),
+                    recentActivities = emptyList()
+                )
+            )
+        }
     }
 }

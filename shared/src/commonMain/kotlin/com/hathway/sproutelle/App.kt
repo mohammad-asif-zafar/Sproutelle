@@ -28,9 +28,9 @@ import theme.SproutelleTheme
 fun App() {
     // Dependencies Setup (Clean Architecture & SOLID Dependency Injection)
     val userPreferencesRepository = remember { UserPreferencesRepositoryImpl() }
-    val homeRepository = remember { HomeRepositoryImpl() }
     val explorerRemoteDataSource = remember { SupabaseExplorerRemoteDataSource() }
     val explorerRepository = remember { ExplorerRepositoryImpl(explorerRemoteDataSource) }
+    val homeRepository = remember { HomeRepositoryImpl(explorerRepository) }
 
     val checkOnboardingStatusUseCase = remember { CheckOnboardingStatusUseCase(userPreferencesRepository) }
     val completeOnboardingUseCase = remember { CompleteOnboardingUseCase(userPreferencesRepository) }

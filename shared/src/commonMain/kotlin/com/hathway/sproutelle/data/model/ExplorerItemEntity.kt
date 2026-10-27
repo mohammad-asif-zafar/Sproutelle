@@ -14,7 +14,7 @@ data class ExplorerItemEntity(
     @SerialName("sort_order") val sortOrder: Int = 0,
     @SerialName("is_active") val isActive: Boolean = true
 ) {
-    fun toDomain(mediaAsset: MediaAssetEntity?, imageAssetId: String?, signedUrl: String?): ExplorerItem {
+    fun toDomain(mediaAsset: MediaAssetEntity?, imageAssetId: String?, signedUrl: String?, signedAt: Long = 0L): ExplorerItem {
         return ExplorerItem(
             id = id,
             titleName = titleName,
@@ -23,7 +23,8 @@ data class ExplorerItemEntity(
             categoryId = categoryId,
             sortOrder = sortOrder,
             isActive = isActive,
-            imageUrl = signedUrl
+            imageUrl = signedUrl,
+            signedAtTimestamp = signedAt
         )
     }
 }

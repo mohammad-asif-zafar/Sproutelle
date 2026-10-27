@@ -49,15 +49,17 @@ class SupabaseExplorerRemoteDataSource : ExplorerRemoteDataSource {
     override suspend fun fetchExplorerItemsFromSupabase(): Result<List<ExplorerItem>> {
         return try {
             val explorerUrl = "${SupabaseConfig.SUPABASE_URL}/rest/v1/homescreen_explorer?is_active=eq.true&order=sort_order.asc"
-            println("SproutelleDiagnostic: Attempting request to Supabase explorer")
-
             val explorerHttpResponse: HttpResponse = client.get(explorerUrl) {
                 header("apikey", SupabaseConfig.SUPABASE_ANON_KEY)
                 header(HttpHeaders.Authorization, "Bearer ${SupabaseConfig.SUPABASE_ANON_KEY}")
                 header(HttpHeaders.Accept, "application/json")
             }
+
+            if (explorerHttpResponse.status.value !in 200..299) {
+                return Result.failure(Exception("Failed to fetch explorer items: HTTP ${explorerHttpResponse.status.value}"))
+            }
+
             val explorerResponse: List<ExplorerItemEntity> = explorerHttpResponse.body()
-            println("SproutelleDiagnostic: Fetched ${explorerResponse.size} active explorer records from Supabase")
 
             val assetIds = explorerResponse.mapNotNull { it.titleImageAssetId }.distinct()
             val mediaMap = if (assetIds.isNotEmpty()) {
@@ -69,95 +71,77 @@ class SupabaseExplorerRemoteDataSource : ExplorerRemoteDataSource {
                         header(HttpHeaders.Authorization, "Bearer ${SupabaseConfig.SUPABASE_ANON_KEY}")
                         header(HttpHeaders.Accept, "application/json")
                     }
-                    val mediaList: List<MediaAssetEntity> = mediaHttpResponse.body()
-                    println("SproutelleDiagnostic: Fetched ${mediaList.size} matching media assets")
-                    mediaList.associateBy { it.id }
-                } catch (e: Exception) {
-                    println("SproutelleDiagnostic: media_assets fetch failed: ${e.message}")
+                    if (mediaHttpResponse.status.value in 200..299) {
+                        val mediaList: List<MediaAssetEntity> = mediaHttpResponse.body()
+                        mediaList.associateBy { it.id }
+                    } else {
+                        emptyMap()
+                    }
+                } catch (_: Exception) {
                     emptyMap()
                 }
             } else {
                 emptyMap()
             }
 
-            val jsonParser = Json {
-                ignoreUnknownKeys = true
-                isLenient = true
-            }
-
-            var representativeTested = false
-            val domainItems = explorerResponse.map { entity ->
+            // Group file paths by bucket for batch signing
+            val pathsByBucket = mutableMapOf<String, MutableList<String>>()
+            explorerResponse.forEach { entity ->
                 val asset = entity.titleImageAssetId?.let { mediaMap[it] }
                 val bucketName = asset?.bucketName ?: "game-assets"
                 val filePath = asset?.filePath
+                if (!bucketName.isBlank() && !filePath.isNullOrBlank()) {
+                    pathsByBucket.getOrPut(bucketName) { mutableListOf() }.add(filePath)
+                }
+            }
 
-                val imageUrl = if (!bucketName.isBlank() && !filePath.isNullOrBlank()) {
-                    try {
-                        val signUrl = "${SupabaseConfig.SUPABASE_URL}/storage/v1/object/sign/$bucketName"
-                        val signResponse: HttpResponse = client.post(signUrl) {
-                            header("apikey", SupabaseConfig.SUPABASE_ANON_KEY)
-                            header(HttpHeaders.Authorization, "Bearer ${SupabaseConfig.SUPABASE_ANON_KEY}")
-                            header(HttpHeaders.ContentType, "application/json")
-                            setBody(SignRequest(expiresIn = 86400, paths = listOf(filePath)))
-                        }
-                        val status = signResponse.status.value
+            val signedUrlMap = mutableMapOf<String, String>()
+            val jsonParser = Json { ignoreUnknownKeys = true; isLenient = true }
+
+            for ((bucketName, paths) in pathsByBucket) {
+                try {
+                    val signUrl = "${SupabaseConfig.SUPABASE_URL}/storage/v1/object/sign/$bucketName"
+                    val signResponse: HttpResponse = client.post(signUrl) {
+                        header("apikey", SupabaseConfig.SUPABASE_ANON_KEY)
+                        header(HttpHeaders.Authorization, "Bearer ${SupabaseConfig.SUPABASE_ANON_KEY}")
+                        header(HttpHeaders.ContentType, "application/json")
+                        setBody(SignRequest(expiresIn = 86400, paths = paths))
+                    }
+                    if (signResponse.status.value in 200..299) {
                         val bodyText = signResponse.bodyAsText()
-                        println("SproutelleDiagnostic: Sign response for '${entity.titleName}' ($filePath) -> Status: $status, Body: $bodyText")
-                        if (status in 200..299) {
-                            val sUrl = try {
-                                val parsedList = jsonParser.decodeFromString<List<SignedUrlResponse>>(bodyText)
-                                parsedList.firstOrNull()?.signedURL
-                            } catch (_: Exception) {
-                                val parsedObj = jsonParser.decodeFromString<SignedUrlResponse>(bodyText)
-                                parsedObj.signedURL
-                            }
-                            if (!sUrl.isNullOrBlank()) {
+                        val responses = try {
+                            jsonParser.decodeFromString<List<SignedUrlResponse>>(bodyText)
+                        } catch (_: Exception) {
+                            listOf(jsonParser.decodeFromString<SignedUrlResponse>(bodyText))
+                        }
+                        responses.forEach { resp ->
+                            val path = resp.path ?: resp.signedURL?.substringAfterLast("/")
+                            val sUrl = resp.signedURL
+                            if (!path.isNullOrBlank() && !sUrl.isNullOrBlank()) {
                                 val fullUrl = when {
                                     sUrl.startsWith("http") -> sUrl
                                     sUrl.startsWith("/storage/v1") -> "${SupabaseConfig.SUPABASE_URL}$sUrl"
                                     sUrl.startsWith("/") -> "${SupabaseConfig.SUPABASE_URL}/storage/v1$sUrl"
                                     else -> "${SupabaseConfig.SUPABASE_URL}/storage/v1/$sUrl"
                                 }
-                                fullUrl
-                            } else {
-                                null
+                                signedUrlMap[path] = fullUrl
                             }
-                        } else {
-                            null
                         }
-                    } catch (e: Exception) {
-                        println("SproutelleDiagnostic: Sign exception for '${entity.titleName}': ${e::class.simpleName} - ${e.message}")
-                        null
                     }
-                } else {
-                    null
+                } catch (_: Exception) {
+                    // Ignore signing errors for individual buckets
                 }
+            }
 
-                println("SproutelleDiagnostic: Category [ID: ${entity.id}, Title: '${entity.titleName}', SortOrder: ${entity.sortOrder}, Active: ${entity.isActive}] -> titleImageAssetId: ${entity.titleImageAssetId}, AssetFound: ${asset != null}, Bucket: $bucketName, FilePath: $filePath, ImageUrl: ${imageUrl?.let { if (it.length > 60) "${it.take(57)}..." else it }}")
-
-                // Test representative image request once
-                if (!representativeTested && imageUrl != null) {
-                    representativeTested = true
-                    try {
-                        val imgResponse: HttpResponse = client.get(imageUrl) {
-                            header("apikey", SupabaseConfig.SUPABASE_ANON_KEY)
-                            header(HttpHeaders.Authorization, "Bearer ${SupabaseConfig.SUPABASE_ANON_KEY}")
-                        }
-                        val status = imgResponse.status.value
-                        val contentType = imgResponse.headers[HttpHeaders.ContentType] ?: "unknown"
-                        val bodyText = if (status != 200) imgResponse.bodyAsText() else ""
-                        println("SproutelleDiagnostic: Representative image request for '${entity.titleName}' -> Status: $status, Content-Type: $contentType, Body: $bodyText")
-                    } catch (e: Exception) {
-                        println("SproutelleDiagnostic: Representative image request exception for '${entity.titleName}': ${e::class.simpleName} - ${e.message}")
-                    }
-                }
-
+            val domainItems = explorerResponse.map { entity ->
+                val asset = entity.titleImageAssetId?.let { mediaMap[it] }
+                val filePath = asset?.filePath
+                val imageUrl = filePath?.let { signedUrlMap[it] }
                 entity.toDomain(asset, entity.titleImageAssetId, imageUrl)
             }
 
             Result.success(domainItems)
         } catch (e: Exception) {
-            println("SproutelleDiagnostic: Supabase request exception: ${e::class.simpleName} - ${e.message}")
             Result.failure(e)
         }
     }

@@ -1,5 +1,8 @@
 package com.hathway.sproutelle.domain.model
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 data class HomeData(
     val userName: String,
     val greetingMessage: String,
@@ -9,6 +12,7 @@ data class HomeData(
     val recentActivities: List<ActivityItem>
 )
 
+@Serializable
 data class PlantItem(
     val id: String,
     val name: String,
@@ -18,13 +22,16 @@ data class PlantItem(
     val badgeColorHex: String
 )
 
+@Serializable
 data class CategoryItem(
     val id: String,
     val title: String,
-    val itemCount: Int,
-    val iconName: String
+    val itemCount: Int = 0,
+    val iconName: String = "",
+    val imageUrl: String? = null
 )
 
+@Serializable
 data class ActivityItem(
     val id: String,
     val title: String,
