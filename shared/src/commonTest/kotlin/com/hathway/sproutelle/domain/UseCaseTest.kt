@@ -34,8 +34,8 @@ class UseCaseTest {
 
         val homeData = getHomeDataUseCase().first()
 
-        assertEquals("Sarah", homeData.userName)
-        assertEquals(3, homeData.activePlants.size)
-        assertEquals(14, homeData.streakDays)
+        assertEquals("Emma", homeData.userName)
+        assertEquals(1, homeData.activePlants.size)
+        assertEquals(5, homeData.streakDays)
     }
 }

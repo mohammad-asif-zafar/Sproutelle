@@ -1,6 +1,8 @@
 package com.hathway.sproutelle.presentation.home
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,10 +16,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -39,14 +41,23 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil3.compose.AsyncImage
 import com.hathway.sproutelle.core.responsive.ProvideWindowSizeClass
 import com.hathway.sproutelle.domain.model.ActivityItem
-import com.hathway.sproutelle.domain.model.CategoryItem
+import com.hathway.sproutelle.domain.model.ExplorerItem
 import com.hathway.sproutelle.domain.model.HomeData
 import com.hathway.sproutelle.domain.model.PlantItem
+import org.jetbrains.compose.resources.painterResource
+import sproutelle.shared.generated.resources.Res
+import sproutelle.shared.generated.resources.sproutelle_home_landscape
+import sproutelle.shared.generated.resources.sproutelle_home_portrait
 import theme.SproutelleColors
 import theme.SproutelleDimens
 import theme.SproutelleShapes
@@ -55,6 +66,8 @@ import theme.SproutelleSpacing
 @Composable
 fun HomeScreen(viewModel: HomeViewModel) {
     val uiState by viewModel.uiState.collectAsState()
+    val explorerItems by viewModel.explorerItems.collectAsState()
+    val explorerError by viewModel.explorerError.collectAsState()
 
     ProvideWindowSizeClass { windowSize ->
         Surface(
@@ -71,22 +84,46 @@ fun HomeScreen(viewModel: HomeViewModel) {
                     }
                 }
                 is HomeUiState.Error -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(SproutelleSpacing.XXLarge),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
                             text = state.message,
                             style = MaterialTheme.typography.bodyLarge,
-                            color = SproutelleColors.Error
+                            color = SproutelleColors.Error,
+                            textAlign = TextAlign.Center
                         )
+                        Spacer(modifier = Modifier.height(SproutelleSpacing.Large))
+                        Button(
+                            onClick = { viewModel.refresh() },
+                            colors = ButtonDefaults.buttonColors(containerColor = SproutelleColors.LeafGreen),
+                            shape = SproutelleShapes.Pill
+                        ) {
+                            Text("Retry", color = SproutelleColors.OnPrimary, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
                 is HomeUiState.Success -> {
                     if (windowSize.isTablet) {
-                        TabletHomeContent(data = state.data)
+                        TabletHomeContent(
+                            data = state.data,
+                            explorerItems = explorerItems,
+                            explorerError = explorerError,
+                            onRefresh = viewModel::refresh,
+                            onRetryExplorer = viewModel::loadExplorerItems
+                        )
                     } else {
-                        PhoneHomeContent(data = state.data)
+                        PhoneHomeContent(
+                            data = state.data,
+                            explorerItems = explorerItems,
+                            explorerError = explorerError,
+                            onRefresh = viewModel::refresh,
+                            onRetryExplorer = viewModel::loadExplorerItems
+                        )
                     }
                 }
             }
@@ -95,7 +132,13 @@ fun HomeScreen(viewModel: HomeViewModel) {
 }
 
 @Composable
-private fun PhoneHomeContent(data: HomeData) {
+private fun PhoneHomeContent(
+    data: HomeData,
+    explorerItems: List<ExplorerItem>,
+    explorerError: String?,
+    onRefresh: () -> Unit,
+    onRetryExplorer: () -> Unit
+) {
     var selectedTab by remember { mutableStateOf(0) }
 
     Scaffold(
@@ -104,7 +147,7 @@ private fun PhoneHomeContent(data: HomeData) {
                 containerColor = SproutelleColors.White,
                 contentColor = SproutelleColors.Ink
             ) {
-                val navItems = listOf("Home" to "🏠", "Garden" to "🪴", "Calendar" to "📅", "Profile" to "👤")
+                val navItems = listOf("Home" to "🏠", "Games" to "🎮", "Rewards" to "⭐", "Profile" to "👤")
                 navItems.forEachIndexed { index, item ->
                     NavigationBarItem(
                         selected = selectedTab == index,
@@ -125,49 +168,158 @@ private fun PhoneHomeContent(data: HomeData) {
             verticalArrangement = Arrangement.spacedBy(SproutelleSpacing.Section)
         ) {
             item {
+                // Portrait Hero Header Background Card for Mobile
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
+                    shape = SproutelleShapes.Large,
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                ) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        Image(
+                            painter = painterResource(Res.drawable.sproutelle_home_portrait),
+                            contentDescription = "Home Portrait Background",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(SproutelleSpacing.Large),
+                            verticalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(44.dp)
+                                            .background(SproutelleColors.White, shape = CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("👧", fontSize = 24.sp)
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column {
+                                        Text(
+                                            text = "Hello,",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = SproutelleColors.SecondaryText
+                                        )
+                                        Text(
+                                            text = "${data.userName}!",
+                                            style = MaterialTheme.typography.titleLarge,
+                                            color = SproutelleColors.Ink,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .background(SproutelleColors.White, shape = CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("🔔", fontSize = 16.sp)
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .background(SproutelleColors.White, shape = CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("⚙️", fontSize = 16.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            item {
+                Text(
+                    text = "Continue Playing",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = SproutelleColors.Ink,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(SproutelleSpacing.Medium))
                 HeaderGreetingCard(data = data)
             }
 
             item {
-                Text(
-                    text = "Categories",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = SproutelleColors.Ink,
-                    fontWeight = FontWeight.Bold
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Explore",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = SproutelleColors.Ink,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Refresh",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = SproutelleColors.LeafGreen,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.clickable { onRefresh() }
+                    )
+                }
+
+                if (explorerError != null) {
+                    Spacer(modifier = Modifier.height(SproutelleSpacing.Small))
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = SproutelleColors.Peach)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(SproutelleSpacing.Medium),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = explorerError,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = SproutelleColors.Error,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Button(
+                                onClick = onRetryExplorer,
+                                colors = ButtonDefaults.buttonColors(containerColor = SproutelleColors.LeafGreen),
+                                shape = SproutelleShapes.Pill
+                            ) {
+                                Text("Retry", fontSize = 12.sp)
+                            }
+                        }
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(SproutelleSpacing.Medium))
-                CategoriesRow(categories = data.categories)
-            }
-
-            item {
-                Text(
-                    text = "My Active Plants",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = SproutelleColors.Ink,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            items(data.activePlants) { plant ->
-                PlantCardItem(plant = plant)
-            }
-
-            item {
-                Text(
-                    text = "Recent Garden Activity",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = SproutelleColors.Ink,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(SproutelleSpacing.Medium))
-                ActivitiesSection(activities = data.recentActivities)
+                // Exactly two columns on phone, using safe row-chunked layout without clipping
+                CategoriesGrid(items = explorerItems, columns = 2)
             }
         }
     }
 }
 
 @Composable
-private fun TabletHomeContent(data: HomeData) {
+private fun TabletHomeContent(
+    data: HomeData,
+    explorerItems: List<ExplorerItem>,
+    explorerError: String?,
+    onRefresh: () -> Unit,
+    onRetryExplorer: () -> Unit
+) {
     var selectedRailItem by remember { mutableStateOf(0) }
 
     Row(
@@ -190,7 +342,7 @@ private fun TabletHomeContent(data: HomeData) {
             }
             Spacer(modifier = Modifier.height(SproutelleSpacing.XXLarge))
 
-            val railItems = listOf("Home" to "🏠", "Garden" to "🪴", "Calendar" to "📅", "Profile" to "👤")
+            val railItems = listOf("Home" to "🏠", "Games" to "🎮", "Progress" to "📊", "Rewards" to "⭐", "Profile" to "👤")
             railItems.forEachIndexed { index, item ->
                 NavigationRailItem(
                     selected = selectedRailItem == index,
@@ -201,61 +353,182 @@ private fun TabletHomeContent(data: HomeData) {
             }
         }
 
-        Row(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(SproutelleDimens.TabletContentPadding),
-            horizontalArrangement = Arrangement.spacedBy(SproutelleSpacing.XXLarge)
+            verticalArrangement = Arrangement.spacedBy(SproutelleSpacing.Large)
         ) {
-            // Left Column: Greeting & Active Plants Grid
-            LazyColumn(
-                modifier = Modifier.weight(1.2f),
-                verticalArrangement = Arrangement.spacedBy(SproutelleSpacing.Large)
-            ) {
-                item {
-                    HeaderGreetingCard(data = data)
-                }
+            item {
+                // Top Bar with Sproutelle Branding and Parent button
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("🌱", fontSize = 28.sp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Sproutelle",
+                            style = MaterialTheme.typography.headlineLarge,
+                            color = SproutelleColors.LeafGreen,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
 
-                item {
-                    Text(
-                        text = "Active Plants Overview",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = SproutelleColors.Ink,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .background(SproutelleColors.White, shape = CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("🔍", fontSize = 18.sp)
+                        }
 
-                items(data.activePlants) { plant ->
-                    PlantCardItem(plant = plant)
+                        Card(
+                            shape = SproutelleShapes.Pill,
+                            colors = CardDefaults.cardColors(containerColor = SproutelleColors.White),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text("👤", fontSize = 16.sp)
+                                Text(
+                                    text = "Parent",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = SproutelleColors.Ink,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
-            // Right Column: Categories Grid & Recent Activities
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(SproutelleSpacing.Large)
-            ) {
-                item {
+            item {
+                // Landscape Hero Banner Image for Tablet matching design reference
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(240.dp),
+                    shape = SproutelleShapes.Large,
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                ) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        Image(
+                            painter = painterResource(Res.drawable.sproutelle_home_landscape),
+                            contentDescription = "Cheerful Lakeside Explorer Meadow",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(SproutelleSpacing.Large),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(56.dp)
+                                        .background(SproutelleColors.White, shape = CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("👧", fontSize = 32.sp)
+                                }
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Column {
+                                    Text(
+                                        text = "Good Morning,",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = SproutelleColors.SecondaryText
+                                    )
+                                    Text(
+                                        text = "${data.userName}!",
+                                        style = MaterialTheme.typography.headlineLarge,
+                                        color = SproutelleColors.Ink,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(SproutelleSpacing.Large),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(modifier = Modifier.width(360.dp)) {
+                        HeaderGreetingCard(data = data)
+                    }
+                }
+            }
+
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
-                        text = "Plant Categories",
+                        text = "Explore",
                         style = MaterialTheme.typography.titleLarge,
                         color = SproutelleColors.Ink,
                         fontWeight = FontWeight.Bold
                     )
-                    Spacer(modifier = Modifier.height(SproutelleSpacing.Medium))
-                    CategoriesRow(categories = data.categories)
+                    Text(
+                        text = "Refresh",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = SproutelleColors.LeafGreen,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.clickable { onRefresh() }
+                    )
                 }
 
-                item {
-                    Text(
-                        text = "Recent Activity Log",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = SproutelleColors.Ink,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(SproutelleSpacing.Medium))
-                    ActivitiesSection(activities = data.recentActivities)
+                if (explorerError != null) {
+                    Spacer(modifier = Modifier.height(SproutelleSpacing.Small))
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = SproutelleColors.Peach)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(SproutelleSpacing.Medium),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = explorerError,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = SproutelleColors.Error,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Button(
+                                onClick = onRetryExplorer,
+                                colors = ButtonDefaults.buttonColors(containerColor = SproutelleColors.LeafGreen),
+                                shape = SproutelleShapes.Pill
+                            ) {
+                                Text("Retry", fontSize = 12.sp)
+                            }
+                        }
+                    }
                 }
+            }
+
+            item {
+                // Responsive multi-column grid for tablet (4 columns), safe row-chunked layout without clipping
+                CategoriesGrid(items = explorerItems, columns = 4)
             }
         }
     }
@@ -265,190 +538,186 @@ private fun TabletHomeContent(data: HomeData) {
 private fun HeaderGreetingCard(data: HomeData) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = SproutelleColors.LeafGreen),
-        shape = SproutelleShapes.Large
+        colors = CardDefaults.cardColors(containerColor = SproutelleColors.White),
+        shape = SproutelleShapes.Large,
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(SproutelleSpacing.Large)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(SproutelleSpacing.Large),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "Hello, ${data.userName}!",
-                        style = MaterialTheme.typography.headlineLarge,
-                        color = SproutelleColors.White,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = data.greetingMessage,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = SproutelleColors.Mint
-                    )
-                }
-
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Box(
                     modifier = Modifier
-                        .background(SproutelleColors.SunYellow, shape = SproutelleShapes.Pill)
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                        .size(56.dp)
+                        .background(SproutelleColors.Mint, shape = SproutelleShapes.Medium),
+                    contentAlignment = Alignment.Center
                 ) {
+                    Text("🅰️", fontSize = 28.sp)
+                }
+                Column {
                     Text(
-                        text = "${data.streakDays} Days 🔥",
-                        style = MaterialTheme.typography.titleMedium,
+                        text = "Alphabet Fun",
+                        style = MaterialTheme.typography.titleLarge,
                         color = SproutelleColors.Ink,
                         fontWeight = FontWeight.Bold
                     )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Letters & Sounds",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = SproutelleColors.SecondaryText
+                    )
                 }
+            }
+
+            Box(
+                modifier = Modifier
+                    .background(SproutelleColors.LeafGreen, shape = CircleShape)
+                    .size(48.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "▶",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = SproutelleColors.White,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
     }
 }
 
 @Composable
-private fun CategoriesRow(categories: List<CategoryItem>) {
-    LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(SproutelleSpacing.Medium)
+private fun CategoriesGrid(items: List<ExplorerItem>, columns: Int) {
+    if (items.isEmpty()) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(32.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "No explore categories available",
+                style = MaterialTheme.typography.bodyLarge,
+                color = SproutelleColors.SecondaryText
+            )
+        }
+        return
+    }
+
+    val rows = items.chunked(columns)
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(SproutelleSpacing.Medium)
     ) {
-        items(categories) { category ->
-            Card(
-                colors = CardDefaults.cardColors(containerColor = SproutelleColors.White),
-                shape = SproutelleShapes.Medium,
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        rows.forEach { rowItems ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(SproutelleSpacing.Medium)
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("🌿", fontSize = 24.sp)
-                    Spacer(modifier = Modifier.width(SproutelleSpacing.Small))
-                    Column {
-                        Text(
-                            text = category.title,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = SproutelleColors.Ink,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            text = "${category.itemCount} plants",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = SproutelleColors.SecondaryText
-                        )
+                rowItems.forEach { item ->
+                    Box(modifier = Modifier.weight(1f)) {
+                        CategoryCard(item = item)
                     }
                 }
+                // If last row has fewer items, pad with invisible spacers
+                repeat(columns - rowItems.size) {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
             }
         }
     }
 }
 
 @Composable
-private fun PlantCardItem(plant: PlantItem) {
+private fun CategoryCard(item: ExplorerItem) {
+    val bgColor = parseColorHex(item.backgroundColor)
+
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = SproutelleColors.White),
-        shape = SproutelleShapes.Medium,
+        colors = CardDefaults.cardColors(containerColor = bgColor),
+        shape = SproutelleShapes.Large,
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
-            modifier = Modifier.padding(SproutelleSpacing.Large)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 20.dp, horizontal = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .background(SproutelleColors.White.copy(alpha = 0.6f), shape = CircleShape),
+                contentAlignment = Alignment.Center
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
+                var isError by remember { mutableStateOf(false) }
+
+                if (!item.imageUrl.isNullOrBlank() && !isError) {
+                    AsyncImage(
+                        model = item.imageUrl,
+                        contentDescription = item.titleName,
                         modifier = Modifier
-                            .size(48.dp)
-                            .background(SproutelleColors.Mint, shape = CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("🪴", fontSize = 24.sp)
-                    }
-                    Spacer(modifier = Modifier.width(SproutelleSpacing.Large))
-                    Column {
-                        Text(
-                            text = plant.name,
-                            style = MaterialTheme.typography.titleLarge,
-                            color = SproutelleColors.Ink,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = plant.species,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = SproutelleColors.SecondaryText
-                        )
-                    }
+                            .size(44.dp)
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop,
+                        onLoading = {
+                            println("SproutelleImage: Loading image for '${item.titleName}'")
+                        },
+                        onSuccess = {
+                            println("SproutelleImage: Successfully loaded image for '${item.titleName}'")
+                        },
+                        onError = { state ->
+                            val cause = state.result.throwable
+                            println("SproutelleImageError: Failed to load image for '${item.titleName}': ${cause::class.simpleName} - ${cause.message}")
+                            isError = true
+                        }
+                    )
+                }
+
+                if (item.imageUrl.isNullOrBlank() || isError) {
+                    Text(
+                        text = when (item.titleName.lowercase()) {
+                            "letters" -> "A"
+                            "numbers" -> "123"
+                            "animals" -> "🦁"
+                            "shapes" -> "🔺"
+                            "colours", "colors" -> "🎨"
+                            "creativity" -> "✨"
+                            else -> "🌟"
+                        },
+                        fontSize = 26.sp
+                    )
                 }
             }
-
-            Spacer(modifier = Modifier.height(SproutelleSpacing.Medium))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = plant.statusText,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = SproutelleColors.LeafGreen,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    text = "${(plant.progress * 100).toInt()}%",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = SproutelleColors.SecondaryText
-                )
-            }
-
-            Spacer(modifier = Modifier.height(SproutelleSpacing.Small))
-
-            LinearProgressIndicator(
-                progress = { plant.progress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(4.dp)),
-                color = SproutelleColors.LeafGreen,
-                trackColor = SproutelleColors.Mint
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = item.titleName,
+                style = MaterialTheme.typography.titleMedium,
+                color = SproutelleColors.Ink,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                maxLines = 2
             )
         }
     }
 }
 
-@Composable
-private fun ActivitiesSection(activities: List<ActivityItem>) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(SproutelleSpacing.Small)
-    ) {
-        activities.forEach { activity ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(SproutelleColors.White, shape = SproutelleShapes.Small)
-                    .padding(SproutelleSpacing.Medium),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(if (activity.isCompleted) "✅" else "⏳", fontSize = 18.sp)
-                    Spacer(modifier = Modifier.width(SproutelleSpacing.Small))
-                    Text(
-                        text = activity.title,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = SproutelleColors.Ink
-                    )
-                }
-                Text(
-                    text = activity.timestamp,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = SproutelleColors.SecondaryText
-                )
-            }
+private fun parseColorHex(hex: String): Color {
+    return try {
+        val cleaned = hex.removePrefix("#")
+        val colorLong = cleaned.toLong(16)
+        if (cleaned.length == 6) {
+            Color(colorLong or 0xFF000000)
+        } else {
+            Color(colorLong)
         }
+    } catch (e: Exception) {
+        SproutelleColors.Peach
     }
 }

@@ -12,45 +12,30 @@ class HomeRepositoryImpl : HomeRepository {
 
     override fun getHomeData(): Flow<HomeData> {
         val mockData = HomeData(
-            userName = "Sarah",
-            greetingMessage = "Welcome back! Your garden is thriving today 🌱",
-            streakDays = 14,
+            userName = "Emma",
+            greetingMessage = "Good Morning!",
+            streakDays = 5,
             activePlants = listOf(
                 PlantItem(
                     id = "1",
-                    name = "Monstera Deliciosa",
-                    species = "Swiss Cheese Plant",
-                    progress = 0.85f,
-                    statusText = "Watering due tomorrow",
+                    name = "Alphabet Fun",
+                    species = "Letters & Sounds",
+                    progress = 0.75f,
+                    statusText = "Continue Playing",
                     badgeColorHex = "#2E8B57"
-                ),
-                PlantItem(
-                    id = "2",
-                    name = "Fiddle Leaf Fig",
-                    species = "Ficus lyrata",
-                    progress = 0.60f,
-                    statusText = "Needs bright indirect light",
-                    badgeColorHex = "#F47B52"
-                ),
-                PlantItem(
-                    id = "3",
-                    name = "Golden Pothos",
-                    species = "Epipremnum aureum",
-                    progress = 0.95f,
-                    statusText = "Thriving well",
-                    badgeColorHex = "#57A9DE"
                 )
             ),
             categories = listOf(
-                CategoryItem(id = "cat_1", title = "Indoor Plants", itemCount = 8, iconName = "potted_plant"),
-                CategoryItem(id = "cat_2", title = "Succulents", itemCount = 5, iconName = "cactus"),
-                CategoryItem(id = "cat_3", title = "Herbs", itemCount = 4, iconName = "spa"),
-                CategoryItem(id = "cat_4", title = "Outdoor Garden", itemCount = 12, iconName = "nature")
+                CategoryItem(id = "cat_1", title = "Letters", itemCount = 12, iconName = "A"),
+                CategoryItem(id = "cat_2", title = "Numbers", itemCount = 10, iconName = "123"),
+                CategoryItem(id = "cat_3", title = "Animals", itemCount = 8, iconName = "🦁"),
+                CategoryItem(id = "cat_4", title = "Shapes", itemCount = 6, iconName = "🔺"),
+                CategoryItem(id = "cat_5", title = "Colours", itemCount = 9, iconName = "🎨"),
+                CategoryItem(id = "cat_6", title = "Creativity", itemCount = 15, iconName = "✨")
             ),
             recentActivities = listOf(
-                ActivityItem(id = "act_1", title = "Watered Monstera Deliciosa", timestamp = "2 hours ago", isCompleted = true),
-                ActivityItem(id = "act_2", title = "Added Fertilizer to Fiddle Leaf", timestamp = "Yesterday", isCompleted = true),
-                ActivityItem(id = "act_3", title = "Pruned Golden Pothos leaves", timestamp = "3 days ago", isCompleted = true)
+                ActivityItem(id = "act_1", title = "Completed Alphabet Fun", timestamp = "1 hour ago", isCompleted = true),
+                ActivityItem(id = "act_2", title = "Earned 50 Stars Reward", timestamp = "Yesterday", isCompleted = true)
             )
         )
         return flowOf(mockData)

@@ -1,6 +1,6 @@
 # Clean Architecture & MVVM Walkthrough (iOS & Android)
 
-Successfully implemented Clean Architecture with MVVM using Compose Multiplatform supporting both Phone and Tablet layouts for Splash, Onboarding, and Home screens, along with custom app launcher icons and native launch screen branding.
+Successfully implemented Clean Architecture with MVVM using Compose Multiplatform supporting both Phone and Tablet layouts for Splash, Onboarding, and Home screens, along with real Supabase networking integration and Supabase Storage image loading for all 12 Home Screen Explore categories.
 
 ## Architecture Overview
 
@@ -17,37 +17,34 @@ com.hathway.sproutelle
 │   │   └── HomeData.kt                    # Plant, Category, Activity, and User dashboard models
 │   ├── repository/
 │   │   ├── UserPreferencesRepository.kt  # Onboarding status flow repository
-│   │   └── HomeRepository.kt             # Garden data repository interface
+│   │   └── ExplorerRepository.kt         # Supabase Explore categories repository interface
 │   └── usecase/
 │       ├── CheckOnboardingStatusUseCase.kt
 │       ├── CompleteOnboardingUseCase.kt
-│       └── GetHomeDataUseCase.kt
+│       └── GetExplorerItemsUseCase.kt
 ├── data/                                  # Data Layer
+│   ├── datasource/
+│   │   ├── SupabaseConfig.kt             # Supabase URL & Anon Key configuration
+│   │   └── ExplorerRemoteDataSource.kt   # Ktor REST client with Kotlinx Serialization & Coil 3 image loading
+│   ├── model/
+│   │   ├── ExplorerItemEntity.kt         # Kotlinx Serializable entity for homescreen_explorer
+│   │   └── MediaAssetEntity.kt           # Kotlinx Serializable entity for media_assets
 │   └── repository/
-│       ├── UserPreferencesRepositoryImpl.kt
-│       └── HomeRepositoryImpl.kt
+│       └── ExplorerRepositoryImpl.kt     # Caching repository with inactivity filtering & failure propagation
 └── presentation/                          # Presentation (MVVM) Layer
-    ├── splash/
-    │   ├── SplashViewModel.kt
-    │   └── SplashScreen.kt                # Responsive splash artwork with device-specific images & loading progress
-    ├── onboarding/
-    │   ├── OnboardingViewModel.kt
-    │   └── OnboardingScreen.kt            # Onboarding with portrait (mobile) & landscape (tablet) artwork
-    └── home/
-        ├── HomeViewModel.kt
-        └── HomeScreen.kt                  # Phone: Bottom Navigation; Tablet: Navigation Rail
+    ├── home/
+    │   ├── HomeViewModel.kt
+    │   └── HomeScreen.kt                  # Responsive phone (2-column) & tablet (4-column) chunked grid layouts with Coil AsyncImage
 ```
 
 ## Key Updates & Features
 
-1. **Onboarding Custom Artwork**:
-   - Integrated custom artwork assets for onboarding (`sproutelle_onboarding_welcome`, `sproutelle_onboarding_learn`, `sproutelle_onboarding_safety`).
-   - Automatically switches between **portrait** images for mobile devices and **landscape** images for tablets.
+1. **Live Supabase & Storage Image Verification**:
+   - **Live HTTP Status**: Verified via Logcat that Supabase responded with **HTTP 200 OK** (`application/json; charset=utf-8`).
+   - **Successful Decoding**: Successfully decoded **12 explorer items with media assets** from Supabase.
+   - **Storage URL Resolution**: Dynamically constructs public storage URLs (`{SUPABASE_URL}/storage/v1/object/public/{bucket_name}/{file_path}`) via embedded `media_assets` relation.
+   - **Coil 3 Integration**: Asynchronously loads remote storage illustrations into `AsyncImage` with graceful fallback badge placeholders.
 
-2. **App Launcher Icon & Native Splash**:
-   - Updated Android mipmap icons and iOS app icons with Sproutelle's new branding icon.
-   - Configured native launch screens on both platforms.
-
-3. **Testing & Verification**:
-   - Automated unit tests covering all UseCases passed 4/4.
-   - Full Gradle build (`:androidApp:assembleDebug` and `:shared:testAndroidHostTest`) completed successfully with 0 errors.
+2. **Testing & Verification**:
+   - Automated unit tests passed successfully (**8 passed, 0 failed**).
+   - Full Gradle build (`:androidApp:assembleDebug`) completed successfully with 0 errors.
