@@ -8,6 +8,8 @@ import com.hathway.sproutelle.domain.model.ExplorerItem
 import com.hathway.sproutelle.domain.model.HomeData
 import com.hathway.sproutelle.domain.repository.ExplorerState
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -74,7 +76,6 @@ class ExplorerRepositoryTest {
         // Deterministically await Cached emission while remote is blocked (zero arbitrary delay)
         val cachedState = repo.getExplorerState().first { it is ExplorerState.Cached }
         assertEquals(cached, (cachedState as ExplorerState.Cached).data)
-        assertEquals(1, remote.fetchCount, "Exactly one remote request should have started")
 
         // Release remote response containing category B
         val fresh = listOf(ExplorerItem("2", "Category B", null, "#fff", "c2", 1, true, imageUrl = "urlB", signedAtTimestamp = 1000L))
@@ -83,6 +84,7 @@ class ExplorerRepositoryTest {
         // Deterministically await Fresh emission
         val freshState = repo.getExplorerState().first { it is ExplorerState.Fresh }
         assertEquals(fresh, (freshState as ExplorerState.Fresh).data)
+        assertEquals(1, remote.fetchCount, "Exactly one remote request should have completed")
         assertEquals(fresh, cache.storedItems, "Category B should be persisted")
     }
 
@@ -199,19 +201,27 @@ class ExplorerRepositoryTest {
 
     @Test
     fun test11_ConcurrentRefreshSharedInFlight(): Unit = runBlocking {
-        val remote = FakeExplorerRemoteDataSource(Result.success(listOf(ExplorerItem("1", "Item", null, "#fff", "c1", 1, true))))
-        val cache = FakeExplorerCacheStorage(listOf(ExplorerItem("1", "Cached", null, "#fff", "c1", 1, true)))
-        val repo = ExplorerRepositoryImpl(remote, cache)
-        repo.getExplorerState().first { it is ExplorerState.Fresh }
-        remote.fetchCount = 0
-        coroutineScope {
-            repeat(5) {
-                launch {
-                    repo.refreshExplorerItems()
-                }
+        val remoteDeferred = CompletableDeferred<Result<List<ExplorerItem>>>()
+        var fetchCount = 0
+        val remote = object : ExplorerRemoteDataSource {
+            override suspend fun fetchExplorerItemsFromSupabase(): Result<List<ExplorerItem>> {
+                fetchCount++
+                return remoteDeferred.await()
             }
         }
-        assertEquals(1, remote.fetchCount)
+        val cache = FakeExplorerCacheStorage(listOf(ExplorerItem("1", "Cached", null, "#fff", "c1", 1, true)))
+        val repo = ExplorerRepositoryImpl(remote, cache)
+
+        val deferreds = coroutineScope {
+            List(5) {
+                async { repo.refreshExplorerItems() }
+            }
+        }
+
+        remoteDeferred.complete(Result.success(listOf(ExplorerItem("1", "Item", null, "#fff", "c1", 1, true))))
+        deferreds.forEach { it.await() }
+
+        assertEquals(1, fetchCount, "Concurrent refresh requests must share the single in-flight remote request")
     }
 
     @Test
