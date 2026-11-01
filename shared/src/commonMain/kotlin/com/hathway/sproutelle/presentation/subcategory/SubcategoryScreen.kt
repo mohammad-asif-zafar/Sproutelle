@@ -17,6 +17,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -25,7 +28,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hathway.sproutelle.core.responsive.ProvideWindowSizeClass
 import org.jetbrains.compose.resources.painterResource
@@ -274,6 +279,30 @@ private fun TabletSubcategoryContent(
 }
 
 @Composable
+private fun SubcategoryCardIllustration(imageUrl: String?, title: String, size: Dp) {
+    var isError by remember { mutableStateOf(false) }
+
+    if (!imageUrl.isNullOrBlank() && !isError) {
+        AsyncImage(
+            model = imageUrl,
+            contentDescription = title,
+            modifier = Modifier
+                .size(size)
+                .clip(RoundedCornerShape(12.dp)),
+            contentScale = ContentScale.Fit,
+            onError = { isError = true }
+        )
+    }
+
+    if (imageUrl.isNullOrBlank() || isError) {
+        Text(
+            text = "🌱",
+            style = MaterialTheme.typography.titleLarge
+        )
+    }
+}
+
+@Composable
 fun MobileSubcategoryCard(
     item: Subcategory,
     onClick: () -> Unit,
@@ -283,27 +312,31 @@ fun MobileSubcategoryCard(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(20.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .size(64.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .size(76.dp)
+                    .clip(RoundedCornerShape(14.dp))
                     .background(item.backgroundColor.toComposeColor()),
                 contentAlignment = Alignment.Center
             ) {
-                Text(text = "🌱", style = MaterialTheme.typography.titleLarge)
+                SubcategoryCardIllustration(
+                    imageUrl = item.imageUrl,
+                    title = item.name,
+                    size = 68.dp
+                )
             }
 
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(20.dp))
 
             Column(
                 modifier = Modifier.weight(1f)
@@ -342,27 +375,31 @@ fun TabletSubcategoryCard(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp),
+                .padding(24.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .size(80.dp)
-                    .clip(RoundedCornerShape(16.dp))
+                    .size(96.dp)
+                    .clip(RoundedCornerShape(18.dp))
                     .background(item.backgroundColor.toComposeColor()),
                 contentAlignment = Alignment.Center
             ) {
-                Text(text = "🌱", style = MaterialTheme.typography.headlineMedium)
+                SubcategoryCardIllustration(
+                    imageUrl = item.imageUrl,
+                    title = item.name,
+                    size = 86.dp
+                )
             }
 
-            Spacer(modifier = Modifier.width(20.dp))
+            Spacer(modifier = Modifier.width(24.dp))
 
             Column(
                 modifier = Modifier.weight(1f)

@@ -95,6 +95,9 @@ fun App() {
                 )
             }
             is Screen.Subcategories -> {
+                SystemBackHandler {
+                    currentScreen = Screen.Home
+                }
                 val subViewModel = remember(screen.explorerId) {
                     SubcategoryViewModel(
                         explorerId = screen.explorerId,
@@ -119,6 +122,12 @@ fun App() {
                 )
             }
             is Screen.GameSelection -> {
+                SystemBackHandler {
+                    currentScreen = Screen.Subcategories(
+                        explorerId = screen.explorerId,
+                        explorerTitle = screen.explorerTitle
+                    )
+                }
                 val gameViewModel = remember(screen.subcategoryId) {
                     GameSelectionViewModel(
                         explorerId = screen.explorerId,
@@ -154,6 +163,14 @@ fun App() {
                 )
             }
             is Screen.Question -> {
+                SystemBackHandler {
+                    currentScreen = Screen.GameSelection(
+                        explorerId = screen.explorerId,
+                        explorerTitle = screen.explorerTitle,
+                        subcategoryId = screen.subcategoryId,
+                        subcategoryName = screen.subcategoryName
+                    )
+                }
                 val questionViewModel = remember(screen.subcategoryId, screen.gameId) {
                     QuestionViewModel(
                         explorerId = screen.explorerId,
@@ -176,6 +193,14 @@ fun App() {
                 )
             }
             is Screen.GameShell -> {
+                SystemBackHandler {
+                    currentScreen = Screen.GameSelection(
+                        explorerId = screen.explorerId,
+                        explorerTitle = screen.explorerTitle,
+                        subcategoryId = screen.subcategoryId,
+                        subcategoryName = screen.subcategoryName
+                    )
+                }
                 val gameShellViewModel = remember(screen.subcategoryId, screen.gameId) {
                     GameShellViewModel(
                         subcategoryId = screen.subcategoryId,
