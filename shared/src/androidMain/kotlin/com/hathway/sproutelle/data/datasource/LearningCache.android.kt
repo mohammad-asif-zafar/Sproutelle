@@ -3,6 +3,7 @@ package com.hathway.sproutelle.data.datasource
 import com.hathway.sproutelle.domain.model.GameItem
 import com.hathway.sproutelle.domain.model.Question
 import com.hathway.sproutelle.domain.model.Subcategory
+import com.hathway.sproutelle.domain.model.SubcategoryWithGames
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -46,6 +47,26 @@ actual class LearningCache : LearningCacheStorage {
             json.decodeFromString<List<GameItem>>(text)
         } catch (e: Exception) {
             println("LearningCache: Error loading games cache: ${e.message}")
+            emptyList()
+        }
+    }
+
+    actual override suspend fun saveGamesForExplorer(explorerId: String, items: List<SubcategoryWithGames>) {
+        saveGamesForExplorerSync(explorerId, items)
+    }
+
+    actual override suspend fun loadGamesForExplorer(explorerId: String): List<SubcategoryWithGames> {
+        return loadGamesForExplorerSync(explorerId)
+    }
+
+    actual override fun loadGamesForExplorerSync(explorerId: String): List<SubcategoryWithGames> {
+        return try {
+            val file = getCacheFile("sproutelle_explorer_games_${explorerId}.json") ?: return emptyList()
+            if (!file.exists()) return emptyList()
+            val text = file.readText()
+            json.decodeFromString<List<SubcategoryWithGames>>(text)
+        } catch (e: Exception) {
+            println("LearningCache: Error loading explorer games cache: ${e.message}")
             emptyList()
         }
     }
@@ -95,6 +116,20 @@ actual class LearningCache : LearningCacheStorage {
             tempFile.renameTo(file)
         } catch (e: Exception) {
             println("LearningCache: Error saving games cache: ${e.message}")
+        }
+    }
+
+    private fun saveGamesForExplorerSync(explorerId: String, items: List<SubcategoryWithGames>) {
+        try {
+            val file = getCacheFile("sproutelle_explorer_games_${explorerId}.json") ?: return
+            file.parentFile?.mkdirs()
+            val tempFile = File(file.parentFile, "${file.name}.tmp")
+            val serialized = json.encodeToString(items)
+            tempFile.writeText(serialized)
+            if (file.exists()) file.delete()
+            tempFile.renameTo(file)
+        } catch (e: Exception) {
+            println("LearningCache: Error saving explorer games cache: ${e.message}")
         }
     }
 

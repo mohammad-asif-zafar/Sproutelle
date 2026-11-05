@@ -36,6 +36,7 @@ class ExplorerRepositoryImpl(
     init {
         repositoryScope.launch {
             ensureInitialized()
+            refreshExplorerItems()
         }
     }
 
@@ -52,8 +53,6 @@ class ExplorerRepositoryImpl(
                     println("ExplorerRepository: Asynchronous cache load error: ${e.message}")
                 }
                 isInitialized = true
-                // Warm-start / cold-start: Always start background refresh directly in this coroutine context
-                refreshExplorerItems()
             }
         }
     }
@@ -75,9 +74,7 @@ class ExplorerRepositoryImpl(
     }
 
     override suspend fun refreshExplorerItems(): Result<Unit> {
-        if (!isInitialized) {
-            ensureInitialized()
-        }
+        ensureInitialized()
         val jobToAwait = refreshMutex.withLock {
             inFlightRefresh?.let { return@withLock it }
             val deferred = repositoryScope.async {

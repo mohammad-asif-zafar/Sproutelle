@@ -7,6 +7,7 @@ import com.hathway.sproutelle.data.datasource.LearningRemoteDataSource
 import com.hathway.sproutelle.domain.model.GameItem
 import com.hathway.sproutelle.domain.model.Question
 import com.hathway.sproutelle.domain.model.Subcategory
+import com.hathway.sproutelle.domain.model.SubcategoryWithGames
 import com.hathway.sproutelle.domain.repository.LearningRepository
 import com.hathway.sproutelle.domain.repository.LearningState
 import kotlinx.coroutines.CoroutineScope
@@ -42,6 +43,12 @@ class LearningRepositoryImpl(
     private val gameInFlight = mutableMapOf<String, Deferred<Result<Unit>>>()
     private val initializedGames = mutableSetOf<String>()
 
+    private val explorerGamesStates = mutableMapOf<String, MutableStateFlow<LearningState<List<SubcategoryWithGames>>>>()
+    private val explorerGamesInitMutex = Mutex()
+    private val explorerGamesRefreshMutex = Mutex()
+    private val explorerGamesInFlight = mutableMapOf<String, Deferred<Result<Unit>>>()
+    private val initializedExplorerGames = mutableSetOf<String>()
+
     private val questionStates = mutableMapOf<String, MutableStateFlow<LearningState<List<Question>>>>()
     private val questionInitMutex = Mutex()
     private val questionRefreshMutex = Mutex()
@@ -56,6 +63,12 @@ class LearningRepositoryImpl(
 
     private fun getOrCreateGameState(subcategoryId: String): MutableStateFlow<LearningState<List<GameItem>>> {
         return gameStates.getOrPut(subcategoryId) {
+            MutableStateFlow(LearningState.Loading)
+        }
+    }
+
+    private fun getOrCreateExplorerGameState(explorerId: String): MutableStateFlow<LearningState<List<SubcategoryWithGames>>> {
+        return explorerGamesStates.getOrPut(explorerId) {
             MutableStateFlow(LearningState.Loading)
         }
     }
@@ -100,6 +113,25 @@ class LearningRepositoryImpl(
                 }
                 initializedGames.add(subcategoryId)
                 refreshGamesForSubcategory(subcategoryId)
+            }
+        }
+    }
+
+    private suspend fun ensureExplorerGamesInitialized(explorerId: String) {
+        if (initializedExplorerGames.contains(explorerId)) return
+        explorerGamesInitMutex.withLock {
+            if (!initializedExplorerGames.contains(explorerId)) {
+                val flow = getOrCreateExplorerGameState(explorerId)
+                try {
+                    val cached = cacheStorage.loadGamesForExplorer(explorerId)
+                    if (cached.isNotEmpty()) {
+                        flow.value = LearningState.Cached(cached)
+                    }
+                } catch (e: Exception) {
+                    println("LearningRepository: Explorer games cache load error: ${e.message}")
+                }
+                initializedExplorerGames.add(explorerId)
+                refreshGamesForExplorer(explorerId)
             }
         }
     }
@@ -280,6 +312,99 @@ class LearningRepositoryImpl(
         return jobToAwait.await()
     }
 
+    override fun getGamesForExplorer(explorerId: String): Flow<List<SubcategoryWithGames>> {
+        return getGamesForExplorerState(explorerId).map { state ->
+            when (state) {
+                is LearningState.Cached -> state.data
+                is LearningState.Fresh -> state.data
+                is LearningState.Offline -> state.data
+                is LearningState.Error -> state.cachedData ?: emptyList()
+                is LearningState.Loading -> emptyList()
+            }
+        }
+    }
+
+    override fun getGamesForExplorerState(explorerId: String): Flow<LearningState<List<SubcategoryWithGames>>> {
+        val flow = getOrCreateExplorerGameState(explorerId)
+        repositoryScope.launch {
+            ensureExplorerGamesInitialized(explorerId)
+        }
+        return flow.asStateFlow()
+    }
+
+    override suspend fun refreshGamesForExplorer(explorerId: String): Result<Unit> {
+        val flow = getOrCreateExplorerGameState(explorerId)
+        val jobToAwait = explorerGamesRefreshMutex.withLock {
+            explorerGamesInFlight[explorerId]?.let { return@withLock it }
+            val deferred = repositoryScope.async {
+                try {
+                    val result = remoteDataSource.fetchGamesForExplorer(explorerId)
+                    result.onSuccess { fetched ->
+                        val currentState = flow.value
+                        val currentItems = when (currentState) {
+                            is LearningState.Cached -> currentState.data
+                            is LearningState.Fresh -> currentState.data
+                            is LearningState.Offline -> currentState.data
+                            is LearningState.Error -> currentState.cachedData ?: emptyList()
+                            is LearningState.Loading -> emptyList()
+                        }
+
+                        val currentMap = currentItems.associateBy { it.subcategory.id }
+                        val mergedItems = fetched.map { newItem ->
+                            val oldItem = currentMap[newItem.subcategory.id]
+                            val now = clock()
+                            val expiryWindow = 24 * 3600 * 1000L
+                            val safetyBuffer = 4 * 3600 * 1000L
+                            val oldSub = oldItem?.subcategory
+                            val newSub = newItem.subcategory
+                            val isUrlValid = !oldSub?.imageUrl.isNullOrBlank() &&
+                                    (now - oldSub.signedAtTimestamp < expiryWindow - safetyBuffer) &&
+                                    oldSub.imageAssetId == newSub.imageAssetId
+
+                            val subcategoryToUse = if (newSub.imageUrl.isNullOrBlank() && isUrlValid) {
+                                newSub.copy(imageUrl = oldSub.imageUrl, signedAtTimestamp = oldSub.signedAtTimestamp)
+                            } else {
+                                newSub.copy(signedAtTimestamp = if (newSub.imageUrl != null) now else 0L)
+                            }
+                            newItem.copy(subcategory = subcategoryToUse)
+                        }
+
+                        flow.value = LearningState.Fresh(mergedItems)
+                        try {
+                            cacheStorage.saveGamesForExplorer(explorerId, mergedItems)
+                        } catch (e: Exception) {
+                            println("LearningRepository: Failed to persist explorer games cache: ${e.message}")
+                        }
+                    }.onFailure { exception ->
+                        val currentState = flow.value
+                        val cachedData = when (currentState) {
+                            is LearningState.Cached -> currentState.data
+                            is LearningState.Fresh -> currentState.data
+                            is LearningState.Offline -> currentState.data
+                            is LearningState.Error -> currentState.cachedData
+                            is LearningState.Loading -> {
+                                try { cacheStorage.loadGamesForExplorer(explorerId) } catch (_: Exception) { emptyList() }
+                            }
+                        }
+                        if (!cachedData.isNullOrEmpty()) {
+                            flow.value = LearningState.Offline(cachedData, exception.message)
+                        } else {
+                            flow.value = LearningState.Error(exception.message ?: "Failed to load games for explorer", null)
+                        }
+                    }
+                    result.map { }
+                } finally {
+                    explorerGamesRefreshMutex.withLock {
+                        explorerGamesInFlight.remove(explorerId)
+                    }
+                }
+            }
+            explorerGamesInFlight[explorerId] = deferred
+            deferred
+        }
+        return jobToAwait.await()
+    }
+
     override fun getQuestions(subcategoryId: String, gameId: String): Flow<List<Question>> {
         return getQuestionsState(subcategoryId, gameId).map { state ->
             when (state) {
@@ -356,6 +481,12 @@ class LearningRepositoryImpl(
     override fun preloadGames(subcategoryId: String) {
         repositoryScope.launch {
             ensureGamesInitialized(subcategoryId)
+        }
+    }
+
+    override fun preloadGamesForExplorer(explorerId: String) {
+        repositoryScope.launch {
+            ensureExplorerGamesInitialized(explorerId)
         }
     }
 

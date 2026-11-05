@@ -355,7 +355,7 @@ private fun TabletHomeContent(
                                     color = SproutelleColors.SecondaryText
                                 )
                                 Text(
-                                    text = "${data.userName}!",
+                                    text = if (data.userName.isNotBlank()) "${data.userName}!" else "Little Gardener!",
                                     style = MaterialTheme.typography.headlineMedium,
                                     color = SproutelleColors.Ink,
                                     fontWeight = FontWeight.Bold

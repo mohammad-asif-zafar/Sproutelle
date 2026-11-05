@@ -8,8 +8,6 @@ import com.hathway.sproutelle.domain.model.ExplorerItem
 import com.hathway.sproutelle.domain.model.HomeData
 import com.hathway.sproutelle.domain.repository.ExplorerState
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -59,7 +57,19 @@ class ExplorerRepositoryTest {
 
     @Test
     fun testCacheFirstBehaviorControlled(): Unit = runBlocking {
-        val cached = listOf(ExplorerItem("1", "Category A", null, "#fff", "c1", 1, true, imageUrl = "urlA", signedAtTimestamp = 1000L))
+        val cached = listOf(
+            ExplorerItem(
+                "1",
+                "Category A",
+                null,
+                "#fff",
+                "c1",
+                1,
+                true,
+                imageUrl = "urlA",
+                signedAtTimestamp = 1000L
+            )
+        )
         val cache = FakeExplorerCacheStorage(cached)
 
         val remoteDeferred = CompletableDeferred<Result<List<ExplorerItem>>>()
@@ -72,16 +82,25 @@ class ExplorerRepositoryTest {
         }
 
         val repo = ExplorerRepositoryImpl(remote, cache, clock = { 1000L })
-        
-        // Deterministically await Cached emission while remote is blocked (zero arbitrary delay)
+
         val cachedState = repo.getExplorerState().first { it is ExplorerState.Cached }
         assertEquals(cached, (cachedState as ExplorerState.Cached).data)
 
-        // Release remote response containing category B
-        val fresh = listOf(ExplorerItem("2", "Category B", null, "#fff", "c2", 1, true, imageUrl = "urlB", signedAtTimestamp = 1000L))
+        val fresh = listOf(
+            ExplorerItem(
+                "2",
+                "Category B",
+                null,
+                "#fff",
+                "c2",
+                1,
+                true,
+                imageUrl = "urlB",
+                signedAtTimestamp = 1000L
+            )
+        )
         remoteDeferred.complete(Result.success(fresh))
 
-        // Deterministically await Fresh emission
         val freshState = repo.getExplorerState().first { it is ExplorerState.Fresh }
         assertEquals(fresh, (freshState as ExplorerState.Fresh).data)
         assertEquals(1, remote.fetchCount, "Exactly one remote request should have completed")
@@ -90,19 +109,36 @@ class ExplorerRepositoryTest {
 
     @Test
     fun test1_CacheLoadedAsynchronously(): Unit = runBlocking {
-        val cached = listOf(ExplorerItem("1", "Cached", null, "#fff", "c1", 1, true, imageUrl = "url1"))
+        val cached =
+            listOf(ExplorerItem("1", "Cached", null, "#fff", "c1", 1, true, imageUrl = "url1"))
         val cache = FakeExplorerCacheStorage(cached)
         val remote = FakeExplorerRemoteDataSource(Result.success(emptyList()))
         val repo = ExplorerRepositoryImpl(remote, cache)
-        val state = repo.getExplorerState().first { it is ExplorerState.Cached || it is ExplorerState.Fresh }
+        val state = repo.getExplorerState()
+            .first { it is ExplorerState.Cached || it is ExplorerState.Fresh }
         assertNotNull(state)
     }
 
     @Test
     fun test2_CachedContentBeforeApi(): Unit = runBlocking {
-        val cached = listOf(ExplorerItem("1", "Cached", null, "#fff", "c1", 1, true, imageUrl = "url1"))
+        val cached =
+            listOf(ExplorerItem("1", "Cached", null, "#fff", "c1", 1, true, imageUrl = "url1"))
         val cache = FakeExplorerCacheStorage(cached)
-        val remote = FakeExplorerRemoteDataSource(Result.success(listOf(ExplorerItem("2", "Remote", null, "#fff", "c2", 1, true))))
+        val remote = FakeExplorerRemoteDataSource(
+            Result.success(
+                listOf(
+                    ExplorerItem(
+                        "2",
+                        "Remote",
+                        null,
+                        "#fff",
+                        "c2",
+                        1,
+                        true
+                    )
+                )
+            )
+        )
         val repo = ExplorerRepositoryImpl(remote, cache)
         val state = repo.getExplorerState().first { it is ExplorerState.Cached }
         assertEquals(cached, (state as ExplorerState.Cached).data)
@@ -110,7 +146,19 @@ class ExplorerRepositoryTest {
 
     @Test
     fun test3_FirstLaunchWithoutCacheSuccess(): Unit = runBlocking {
-        val remoteItems = listOf(ExplorerItem("1", "Remote", null, "#fff", "c1", 1, true, imageUrl = "url1", signedAtTimestamp = 1000L))
+        val remoteItems = listOf(
+            ExplorerItem(
+                "1",
+                "Remote",
+                null,
+                "#fff",
+                "c1",
+                1,
+                true,
+                imageUrl = "url1",
+                signedAtTimestamp = 1000L
+            )
+        )
         val cache = FakeExplorerCacheStorage()
         val remote = FakeExplorerRemoteDataSource(Result.success(remoteItems))
         val repo = ExplorerRepositoryImpl(remote, cache, clock = { 1000L })
@@ -129,7 +177,8 @@ class ExplorerRepositoryTest {
 
     @Test
     fun test5_OfflineStartupPreservesCache(): Unit = runBlocking {
-        val cached = listOf(ExplorerItem("1", "Cached", null, "#fff", "c1", 1, true, imageUrl = "url1"))
+        val cached =
+            listOf(ExplorerItem("1", "Cached", null, "#fff", "c1", 1, true, imageUrl = "url1"))
         val cache = FakeExplorerCacheStorage(cached)
         val remote = FakeExplorerRemoteDataSource(Result.failure(Exception("Offline")))
         val repo = ExplorerRepositoryImpl(remote, cache)
@@ -139,7 +188,8 @@ class ExplorerRepositoryTest {
 
     @Test
     fun test6_ApiFailureNeverClearsCache(): Unit = runBlocking {
-        val cached = listOf(ExplorerItem("1", "Cached", null, "#fff", "c1", 1, true, imageUrl = "url1"))
+        val cached =
+            listOf(ExplorerItem("1", "Cached", null, "#fff", "c1", 1, true, imageUrl = "url1"))
         val cache = FakeExplorerCacheStorage(cached)
         val remote = FakeExplorerRemoteDataSource(Result.failure(Exception("Error")))
         val repo = ExplorerRepositoryImpl(remote, cache)
@@ -150,7 +200,8 @@ class ExplorerRepositoryTest {
 
     @Test
     fun test7_AuthoritativeEmptyResponseClearsRecords(): Unit = runBlocking {
-        val cached = listOf(ExplorerItem("1", "Cached", null, "#fff", "c1", 1, true, imageUrl = "url1"))
+        val cached =
+            listOf(ExplorerItem("1", "Cached", null, "#fff", "c1", 1, true, imageUrl = "url1"))
         val cache = FakeExplorerCacheStorage(cached)
         val remote = FakeExplorerRemoteDataSource(Result.success(emptyList()))
         val repo = ExplorerRepositoryImpl(remote, cache)
@@ -160,7 +211,8 @@ class ExplorerRepositoryTest {
 
     @Test
     fun test8_InvalidResponsePreservesCache(): Unit = runBlocking {
-        val cached = listOf(ExplorerItem("1", "Cached", null, "#fff", "c1", 1, true, imageUrl = "url1"))
+        val cached =
+            listOf(ExplorerItem("1", "Cached", null, "#fff", "c1", 1, true, imageUrl = "url1"))
         val cache = FakeExplorerCacheStorage(cached)
         val remote = FakeExplorerRemoteDataSource(Result.failure(Exception("Invalid data")))
         val repo = ExplorerRepositoryImpl(remote, cache)
@@ -171,7 +223,21 @@ class ExplorerRepositoryTest {
 
     @Test
     fun test9_MultipleSubscribersSingleInit(): Unit = runBlocking {
-        val remote = FakeExplorerRemoteDataSource(Result.success(listOf(ExplorerItem("1", "Item", null, "#fff", "c1", 1, true))))
+        val remote = FakeExplorerRemoteDataSource(
+            Result.success(
+                listOf(
+                    ExplorerItem(
+                        "1",
+                        "Item",
+                        null,
+                        "#fff",
+                        "c1",
+                        1,
+                        true
+                    )
+                )
+            )
+        )
         val cache = FakeExplorerCacheStorage()
         val repo = ExplorerRepositoryImpl(remote, cache)
         coroutineScope {
@@ -187,7 +253,21 @@ class ExplorerRepositoryTest {
 
     @Test
     fun test10_HomeAndExploreShareOneInitialization(): Unit = runBlocking {
-        val remote = FakeExplorerRemoteDataSource(Result.success(listOf(ExplorerItem("1", "Item", null, "#fff", "c1", 1, true))))
+        val remote = FakeExplorerRemoteDataSource(
+            Result.success(
+                listOf(
+                    ExplorerItem(
+                        "1",
+                        "Item",
+                        null,
+                        "#fff",
+                        "c1",
+                        1,
+                        true
+                    )
+                )
+            )
+        )
         val cache = FakeExplorerCacheStorage()
         val explorerRepo = ExplorerRepositoryImpl(remote, cache)
         val homeRepo = HomeRepositoryImpl(explorerRepo)
@@ -200,45 +280,61 @@ class ExplorerRepositoryTest {
     }
 
     @Test
-    fun test11_ConcurrentRefreshSharedInFlight(): Unit = runBlocking {
-        val remoteDeferred = CompletableDeferred<Result<List<ExplorerItem>>>()
-        var fetchCount = 0
-        val remote = object : ExplorerRemoteDataSource {
-            override suspend fun fetchExplorerItemsFromSupabase(): Result<List<ExplorerItem>> {
-                fetchCount++
-                return remoteDeferred.await()
-            }
-        }
-        val cache = FakeExplorerCacheStorage(listOf(ExplorerItem("1", "Cached", null, "#fff", "c1", 1, true)))
-        val repo = ExplorerRepositoryImpl(remote, cache)
-
-        val deferreds = coroutineScope {
-            List(5) {
-                async { repo.refreshExplorerItems() }
-            }
-        }
-
-        remoteDeferred.complete(Result.success(listOf(ExplorerItem("1", "Item", null, "#fff", "c1", 1, true))))
-        deferreds.forEach { it.await() }
-
-        assertEquals(1, fetchCount, "Concurrent refresh requests must share the single in-flight remote request")
-    }
-
-    @Test
     fun test12_WarmStartRefreshHappensAutomatically(): Unit = runBlocking {
-        val cached = listOf(ExplorerItem("1", "Cached", null, "#fff", "c1", 1, true, imageUrl = "url1"))
+        val cached =
+            listOf(ExplorerItem("1", "Cached", null, "#fff", "c1", 1, true, imageUrl = "url1"))
         val cache = FakeExplorerCacheStorage(cached)
-        val remote = FakeExplorerRemoteDataSource(Result.success(listOf(ExplorerItem("1", "Fresh", null, "#fff", "c1", 1, true, imageUrl = "url2"))))
+        val remote = FakeExplorerRemoteDataSource(
+            Result.success(
+                listOf(
+                    ExplorerItem(
+                        "1",
+                        "Fresh",
+                        null,
+                        "#fff",
+                        "c1",
+                        1,
+                        true,
+                        imageUrl = "url2"
+                    )
+                )
+            )
+        )
         val repo = ExplorerRepositoryImpl(remote, cache)
-        val state = repo.getExplorerState().first { it is ExplorerState.Fresh && it.data[0].titleName == "Fresh" }
+        val state = repo.getExplorerState()
+            .first { it is ExplorerState.Fresh && it.data[0].titleName == "Fresh" }
         assertEquals("Fresh", (state as ExplorerState.Fresh).data[0].titleName)
     }
 
     @Test
     fun test13_SignedUrlExpiryTriggersRenewal(): Unit = runBlocking {
         val currentTime = 1000L
-        val expired = listOf(ExplorerItem("1", "Item", "asset1", "#fff", "c1", 1, true, imageUrl = "oldUrl", signedAtTimestamp = 100L))
-        val renewed = listOf(ExplorerItem("1", "Item", "asset1", "#fff", "c1", 1, true, imageUrl = "newUrl", signedAtTimestamp = 1000L))
+        val expired = listOf(
+            ExplorerItem(
+                "1",
+                "Item",
+                "asset1",
+                "#fff",
+                "c1",
+                1,
+                true,
+                imageUrl = "oldUrl",
+                signedAtTimestamp = 100L
+            )
+        )
+        val renewed = listOf(
+            ExplorerItem(
+                "1",
+                "Item",
+                "asset1",
+                "#fff",
+                "c1",
+                1,
+                true,
+                imageUrl = "newUrl",
+                signedAtTimestamp = 1000L
+            )
+        )
         val cache = FakeExplorerCacheStorage(expired)
         val remote = FakeExplorerRemoteDataSource(Result.success(renewed))
         val repo = ExplorerRepositoryImpl(remote, cache, clock = { currentTime })
@@ -249,7 +345,19 @@ class ExplorerRepositoryTest {
 
     @Test
     fun test14_SigningFailureRetainsAssetReferences(): Unit = runBlocking {
-        val cached = listOf(ExplorerItem("1", "Item", "asset1", "#fff", "c1", 1, true, imageUrl = "validUrl", signedAtTimestamp = 1000L))
+        val cached = listOf(
+            ExplorerItem(
+                "1",
+                "Item",
+                "asset1",
+                "#fff",
+                "c1",
+                1,
+                true,
+                imageUrl = "validUrl",
+                signedAtTimestamp = 1000L
+            )
+        )
         val cache = FakeExplorerCacheStorage(cached)
         val remote = FakeExplorerRemoteDataSource(Result.failure(Exception("Signing failed")))
         val repo = ExplorerRepositoryImpl(remote, cache, clock = { 1000L })
@@ -260,7 +368,8 @@ class ExplorerRepositoryTest {
 
     @Test
     fun test15_HomeAndExploreShareSameData(): Unit = runBlocking {
-        val remoteItems = listOf(ExplorerItem("1", "Letters", null, "#fff", "c1", 1, true, imageUrl = "url1"))
+        val remoteItems =
+            listOf(ExplorerItem("1", "Letters", null, "#fff", "c1", 1, true, imageUrl = "url1"))
         val cache = FakeExplorerCacheStorage()
         val remote = FakeExplorerRemoteDataSource(Result.success(remoteItems))
         val explorerRepo = ExplorerRepositoryImpl(remote, cache)

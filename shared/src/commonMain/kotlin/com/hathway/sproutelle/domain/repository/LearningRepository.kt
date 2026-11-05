@@ -3,6 +3,7 @@ package com.hathway.sproutelle.domain.repository
 import com.hathway.sproutelle.domain.model.GameItem
 import com.hathway.sproutelle.domain.model.Question
 import com.hathway.sproutelle.domain.model.Subcategory
+import com.hathway.sproutelle.domain.model.SubcategoryWithGames
 import kotlinx.coroutines.flow.Flow
 
 sealed interface LearningState<out T> {
@@ -22,11 +23,16 @@ interface LearningRepository {
     fun getGamesForSubcategoryState(subcategoryId: String): Flow<LearningState<List<GameItem>>>
     suspend fun refreshGamesForSubcategory(subcategoryId: String): Result<Unit>
 
+    fun getGamesForExplorer(explorerId: String): Flow<List<SubcategoryWithGames>>
+    fun getGamesForExplorerState(explorerId: String): Flow<LearningState<List<SubcategoryWithGames>>>
+    suspend fun refreshGamesForExplorer(explorerId: String): Result<Unit>
+
     fun getQuestions(subcategoryId: String, gameId: String): Flow<List<Question>>
     fun getQuestionsState(subcategoryId: String, gameId: String): Flow<LearningState<List<Question>>>
     suspend fun refreshQuestions(subcategoryId: String, gameId: String): Result<Unit>
 
     fun preloadSubcategories(explorerId: String)
     fun preloadGames(subcategoryId: String)
+    fun preloadGamesForExplorer(explorerId: String)
     fun preloadQuestions(subcategoryId: String, gameId: String)
 }

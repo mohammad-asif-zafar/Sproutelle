@@ -9,6 +9,7 @@ import com.hathway.sproutelle.data.model.SubcategoryGameEntity
 import com.hathway.sproutelle.domain.model.GameItem
 import com.hathway.sproutelle.domain.model.Question
 import com.hathway.sproutelle.domain.model.Subcategory
+import com.hathway.sproutelle.domain.model.SubcategoryWithGames
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -25,6 +26,7 @@ import kotlinx.serialization.json.Json
 interface LearningRemoteDataSource {
     suspend fun fetchSubcategories(explorerId: String): Result<List<Subcategory>>
     suspend fun fetchGamesForSubcategory(subcategoryId: String): Result<List<GameItem>>
+    suspend fun fetchGamesForExplorer(explorerId: String): Result<List<SubcategoryWithGames>>
     suspend fun fetchQuestions(subcategoryId: String, gameId: String): Result<List<Question>>
 }
 
@@ -179,6 +181,66 @@ class SupabaseLearningRemoteDataSource(
             }
 
             Result.success(domainGames)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun fetchGamesForExplorer(explorerId: String): Result<List<SubcategoryWithGames>> {
+        return try {
+            val subcategoriesResult = fetchSubcategories(explorerId)
+            if (subcategoriesResult.isFailure) {
+                return Result.failure(subcategoriesResult.exceptionOrNull() ?: Exception("Failed to fetch subcategories for explorer"))
+            }
+            val subcategories = subcategoriesResult.getOrDefault(emptyList()).filter { it.isActive }
+            if (subcategories.isEmpty()) {
+                return Result.success(emptyList())
+            }
+
+            val subcategoryIds = subcategories.map { it.id }
+            val idsParam = subcategoryIds.joinToString(",")
+            val assignmentsUrl = "${SupabaseConfig.SUPABASE_URL}/rest/v1/subcategory_games?subcategory_id=in.($idsParam)&is_active=eq.true&order=sort_order.asc"
+            val assignmentsResponse: HttpResponse = client.get(assignmentsUrl) {
+                header("apikey", SupabaseConfig.SUPABASE_ANON_KEY)
+                header(HttpHeaders.Authorization, "Bearer ${SupabaseConfig.SUPABASE_ANON_KEY}")
+                header(HttpHeaders.Accept, "application/json")
+            }
+
+            if (assignmentsResponse.status.value !in 200..299) {
+                return Result.failure(Exception("Failed to fetch game assignments for explorer: HTTP ${assignmentsResponse.status.value}"))
+            }
+
+            val assignmentEntities: List<SubcategoryGameEntity> = assignmentsResponse.body()
+            val gameIds = assignmentEntities.map { it.gameId }.distinct()
+
+            val gameMap = if (gameIds.isNotEmpty()) {
+                val gameIdsParam = gameIds.joinToString(",")
+                val gamesUrl = "${SupabaseConfig.SUPABASE_URL}/rest/v1/games?id=in.($gameIdsParam)&is_published=eq.true"
+                val gamesResponse: HttpResponse = client.get(gamesUrl) {
+                    header("apikey", SupabaseConfig.SUPABASE_ANON_KEY)
+                    header(HttpHeaders.Authorization, "Bearer ${SupabaseConfig.SUPABASE_ANON_KEY}")
+                    header(HttpHeaders.Accept, "application/json")
+                }
+                if (gamesResponse.status.value in 200..299) {
+                    val gameEntities: List<GameEntity> = gamesResponse.body()
+                    gameEntities.associateBy { it.id }
+                } else {
+                    emptyMap()
+                }
+            } else {
+                emptyMap()
+            }
+
+            val subcategoryWithGamesList = subcategories.map { subcategory ->
+                val assignments = assignmentEntities.filter { it.subcategoryId == subcategory.id }
+                val games = assignments.mapNotNull { assignment ->
+                    val game = gameMap[assignment.gameId]
+                    game?.toDomain(assignment)
+                }.filter { it.isActive && it.isPublished }
+                SubcategoryWithGames(subcategory, games)
+            }
+
+            Result.success(subcategoryWithGamesList)
         } catch (e: Exception) {
             Result.failure(e)
         }

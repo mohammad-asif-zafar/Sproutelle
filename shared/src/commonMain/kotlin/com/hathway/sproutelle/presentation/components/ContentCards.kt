@@ -67,7 +67,7 @@ fun CategoryCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                CardIllustration(imageUrl = item.imageUrl, title = item.titleName, size = 170.dp)
+                CardIllustration(imageUrl = item.imageUrl, title = item.titleName, size = 96.dp)
 
                 Column(
                     modifier = Modifier
@@ -327,10 +327,12 @@ fun GameCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val iconEmoji = when (game.gameType.lowercase()) {
-        "garden_quiz", "quiz" -> "❓"
-        "image_selection" -> "🖼️"
-        "spelling_bee" -> "🐝"
+    val iconEmoji = when {
+        game.name.contains("Star", ignoreCase = true) || game.name.contains("Count", ignoreCase = true) -> "⭐"
+        game.name.contains("Puzzle", ignoreCase = true) || game.name.contains("Match", ignoreCase = true) -> "🧩"
+        game.gameType.lowercase() in listOf("garden_quiz", "quiz") -> "❓"
+        game.gameType.lowercase() == "image_selection" -> "🖼️"
+        game.gameType.lowercase() == "spelling_bee" -> "🐝"
         else -> "🎮"
     }
 
@@ -341,57 +343,80 @@ fun GameCard(
         else -> "Mini Game"
     }
 
+    val thumbnailBgColor = when (iconEmoji) {
+        "⭐" -> Color(0xFFE8DEF8)
+        "🧩" -> Color(0xFFE1F5FE)
+        "🐝" -> Color(0xFFFFF9C4)
+        "❓" -> Color(0xFFFFE0B2)
+        else -> Color(0xFFE8F5E9)
+    }
+
+    val badgeBgColor = when (typeBadgeText) {
+        "Mini Game" -> Color(0xFFEDE7F6)
+        "Full Game" -> Color(0xFFFFF3E0)
+        else -> SproutelleColors.Peach
+    }
+
+    val badgeTextColor = when (typeBadgeText) {
+        "Mini Game" -> Color(0xFF673AB7)
+        "Full Game" -> Color(0xFFE65100)
+        else -> SproutelleColors.Ink
+    }
+
     Card(
         modifier = modifier
             .fillMaxWidth()
             .clickable { onClick() },
         colors = CardDefaults.cardColors(containerColor = SproutelleColors.White),
-        shape = SproutelleShapes.Large,
+        shape = RoundedCornerShape(24.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(if (isTablet) 20.dp else 16.dp),
+                .padding(if (isTablet) 18.dp else 14.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(
                 modifier = Modifier.weight(1f),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 Box(
                     modifier = Modifier
-                        .size(if (isTablet) 64.dp else 56.dp)
-                        .background(SproutelleColors.Mint, shape = SproutelleShapes.Medium),
+                        .size(if (isTablet) 72.dp else 64.dp)
+                        .background(thumbnailBgColor, shape = RoundedCornerShape(18.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(iconEmoji, fontSize = if (isTablet) 32.sp else 28.sp)
+                    Text(iconEmoji, fontSize = if (isTablet) 36.sp else 30.sp)
                 }
 
-                Column {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = game.name,
+                        style = if (isTablet) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
+                        color = SproutelleColors.Ink,
+                        fontWeight = FontWeight.Bold
+                    )
+
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Text(
-                            text = game.name,
-                            style = MaterialTheme.typography.titleLarge,
-                            color = SproutelleColors.Ink,
-                            fontWeight = FontWeight.Bold
-                        )
                         Surface(
                             shape = SproutelleShapes.Pill,
-                            color = SproutelleColors.Peach
+                            color = badgeBgColor
                         ) {
                             Text(
                                 text = typeBadgeText,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = SproutelleColors.Ink,
+                                color = badgeTextColor,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 10.sp,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                fontSize = 11.sp,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
                             )
                         }
 
@@ -405,47 +430,21 @@ fun GameCard(
                                     style = MaterialTheme.typography.labelSmall,
                                     color = Color(0xFFB35900),
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 10.sp,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    fontSize = 11.sp,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                                 )
                             }
                         }
-
-                        if (!game.difficulty.isNullOrBlank()) {
-                            Surface(
-                                shape = SproutelleShapes.Pill,
-                                color = SproutelleColors.CloudBlue
-                            ) {
-                                Text(
-                                    text = game.difficulty.replaceFirstChar { it.uppercase() },
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = SproutelleColors.Ink,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 10.sp,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    if (!game.description.isNullOrBlank()) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = game.description,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = SproutelleColors.SecondaryText,
-                            maxLines = 2
-                        )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.size(12.dp))
+            Spacer(modifier = Modifier.size(10.dp))
 
             Box(
                 modifier = Modifier
-                    .background(SproutelleColors.LeafGreen, shape = CircleShape)
-                    .size(if (isTablet) 52.dp else 44.dp),
+                    .background(Color(0xFF4CAF50), shape = CircleShape)
+                    .size(if (isTablet) 48.dp else 42.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -453,7 +452,7 @@ fun GameCard(
                     style = MaterialTheme.typography.titleMedium,
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
-                    fontSize = if (isTablet) 20.sp else 16.sp
+                    fontSize = if (isTablet) 18.sp else 15.sp
                 )
             }
         }

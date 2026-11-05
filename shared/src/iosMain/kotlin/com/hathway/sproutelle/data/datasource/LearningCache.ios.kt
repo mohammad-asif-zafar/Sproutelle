@@ -3,6 +3,7 @@ package com.hathway.sproutelle.data.datasource
 import com.hathway.sproutelle.domain.model.GameItem
 import com.hathway.sproutelle.domain.model.Question
 import com.hathway.sproutelle.domain.model.Subcategory
+import com.hathway.sproutelle.domain.model.SubcategoryWithGames
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -54,6 +55,26 @@ actual class LearningCache : LearningCacheStorage {
         val content = loadStringFromFile("sproutelle_games_${subcategoryId}.json") ?: return emptyList()
         return try {
             json.decodeFromString<List<GameItem>>(content)
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    @OptIn(ExperimentalForeignApi::class, kotlinx.cinterop.BetaInteropApi::class)
+    actual override suspend fun saveGamesForExplorer(explorerId: String, items: List<SubcategoryWithGames>) {
+        saveStringToFile("sproutelle_explorer_games_${explorerId}.json", json.encodeToString(items))
+    }
+
+    @OptIn(ExperimentalForeignApi::class)
+    actual override suspend fun loadGamesForExplorer(explorerId: String): List<SubcategoryWithGames> {
+        return loadGamesForExplorerSync(explorerId)
+    }
+
+    @OptIn(ExperimentalForeignApi::class)
+    actual override fun loadGamesForExplorerSync(explorerId: String): List<SubcategoryWithGames> {
+        val content = loadStringFromFile("sproutelle_explorer_games_${explorerId}.json") ?: return emptyList()
+        return try {
+            json.decodeFromString<List<SubcategoryWithGames>>(content)
         } catch (e: Exception) {
             emptyList()
         }

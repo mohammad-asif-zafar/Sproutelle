@@ -9,6 +9,7 @@ import com.hathway.sproutelle.domain.model.GameItem
 import com.hathway.sproutelle.domain.model.Question
 import com.hathway.sproutelle.domain.model.QuestionOption
 import com.hathway.sproutelle.domain.model.Subcategory
+import com.hathway.sproutelle.domain.model.SubcategoryWithGames
 import com.hathway.sproutelle.domain.repository.LearningState
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -22,10 +23,12 @@ class LearningRepositoryTest {
     private class FakeLearningRemoteDataSource(
         var subcategoriesToReturn: Map<String, Result<List<Subcategory>>> = emptyMap(),
         var gamesToReturn: Map<String, Result<List<GameItem>>> = emptyMap(),
+        var gamesForExplorerToReturn: Map<String, Result<List<SubcategoryWithGames>>> = emptyMap(),
         var questionsToReturn: Map<String, Result<List<Question>>> = emptyMap()
     ) : LearningRemoteDataSource {
         var subcategoryFetchCount = 0
         var gameFetchCount = 0
+        var explorerGameFetchCount = 0
         var questionFetchCount = 0
 
         override suspend fun fetchSubcategories(explorerId: String): Result<List<Subcategory>> {
@@ -38,6 +41,11 @@ class LearningRepositoryTest {
             return gamesToReturn[subcategoryId] ?: Result.success(emptyList())
         }
 
+        override suspend fun fetchGamesForExplorer(explorerId: String): Result<List<SubcategoryWithGames>> {
+            explorerGameFetchCount++
+            return gamesForExplorerToReturn[explorerId] ?: Result.success(emptyList())
+        }
+
         override suspend fun fetchQuestions(subcategoryId: String, gameId: String): Result<List<Question>> {
             questionFetchCount++
             val key = "${subcategoryId}_${gameId}"
@@ -48,10 +56,12 @@ class LearningRepositoryTest {
     private class FakeLearningCacheStorage(
         initialSubcategories: Map<String, List<Subcategory>> = emptyMap(),
         initialGames: Map<String, List<GameItem>> = emptyMap(),
+        initialExplorerGames: Map<String, List<SubcategoryWithGames>> = emptyMap(),
         initialQuestions: Map<String, List<Question>> = emptyMap()
     ) : LearningCacheStorage {
         val storedSubcategories = initialSubcategories.toMutableMap()
         val storedGames = initialGames.toMutableMap()
+        val storedExplorerGames = initialExplorerGames.toMutableMap()
         val storedQuestions = initialQuestions.toMutableMap()
 
         override suspend fun saveSubcategories(explorerId: String, items: List<Subcategory>) {
@@ -76,6 +86,18 @@ class LearningRepositoryTest {
 
         override fun loadGamesSync(subcategoryId: String): List<GameItem> {
             return storedGames[subcategoryId] ?: emptyList()
+        }
+
+        override suspend fun saveGamesForExplorer(explorerId: String, items: List<SubcategoryWithGames>) {
+            storedExplorerGames[explorerId] = items
+        }
+
+        override suspend fun loadGamesForExplorer(explorerId: String): List<SubcategoryWithGames> {
+            return storedExplorerGames[explorerId] ?: emptyList()
+        }
+
+        override fun loadGamesForExplorerSync(explorerId: String): List<SubcategoryWithGames> {
+            return storedExplorerGames[explorerId] ?: emptyList()
         }
 
         override suspend fun saveQuestions(subcategoryId: String, gameId: String, items: List<Question>) {
@@ -129,30 +151,33 @@ class LearningRepositoryTest {
     }
 
     @Test
-    fun test3_SameGameAssignedToMultipleSubcategories(): Unit = runBlocking {
-        val gameId = "shared_game_1"
-        val sub1 = "sub_1"
-        val sub2 = "sub_2"
+    fun test3_ExplorerGamesAggregationAndGrouping(): Unit = runBlocking {
+        val explorerId = "exp_1"
+        val sub1 = Subcategory("sub_1", explorerId, "Fruits", null, "#E8F8EE", null, 1, true)
+        val sub2 = Subcategory("sub_2", explorerId, "Vegetables", null, "#FCE4D6", null, 2, true)
 
-        val gamesSub1 = listOf(GameItem("assign_1", sub1, gameId, "Shared Quiz", "quiz", "Desc", "quiz", true, 1, true))
-        val gamesSub2 = listOf(GameItem("assign_2", sub2, gameId, "Shared Quiz", "quiz", "Desc", "quiz", true, 1, true))
+        val game1 = GameItem("a1", "sub_1", "g1", "Apple Game", "apple", "Desc", "quiz", true, 1, true)
+        val game2 = GameItem("a2", "sub_2", "g2", "Carrot Game", "carrot", "Desc", "quiz", true, 1, true)
 
-        val remote = FakeLearningRemoteDataSource(gamesToReturn = mapOf(
-            sub1 to Result.success(gamesSub1),
-            sub2 to Result.success(gamesSub2)
-        ))
+        val explorerGames = listOf(
+            SubcategoryWithGames(sub1, listOf(game1)),
+            SubcategoryWithGames(sub2, listOf(game2))
+        )
+
+        val remote = FakeLearningRemoteDataSource(gamesForExplorerToReturn = mapOf(explorerId to Result.success(explorerGames)))
         val cache = FakeLearningCacheStorage()
         val repository = LearningRepositoryImpl(remote, cache)
 
-        val loadedSub1 = repository.getGamesForSubcategory(sub1).first { it.isNotEmpty() }
-        val loadedSub2 = repository.getGamesForSubcategory(sub2).first { it.isNotEmpty() }
-
-        assertEquals(1, loadedSub1.size)
-        assertEquals(1, loadedSub2.size)
-        assertEquals(sub1, loadedSub1[0].subcategoryId)
-        assertEquals(sub2, loadedSub2[0].subcategoryId)
-        assertEquals(gameId, loadedSub1[0].gameId)
-        assertEquals(gameId, loadedSub2[0].gameId)
+        val state = repository.getGamesForExplorerState(explorerId).first { it is LearningState.Fresh }
+        assertNotNull(state)
+        val loaded = (state as LearningState.Fresh).data
+        assertEquals(2, loaded.size)
+        assertEquals("Fruits", loaded[0].subcategory.name)
+        assertEquals(1, loaded[0].games.size)
+        assertEquals("Apple Game", loaded[0].games[0].name)
+        assertEquals("Vegetables", loaded[1].subcategory.name)
+        assertEquals(1, loaded[1].games.size)
+        assertEquals("Carrot Game", loaded[1].games[0].name)
     }
 
     @Test
@@ -338,11 +363,9 @@ class LearningRepositoryTest {
         val gameId = "game_quiz"
         val gameName = "Quizzy Pop"
 
-        val gameSelection = com.hathway.sproutelle.core.navigation.Screen.GameSelection(
+        val gamesScreen = com.hathway.sproutelle.core.navigation.Screen.Games(
             explorerId = explorerId,
-            explorerTitle = explorerTitle,
-            subcategoryId = subcategoryId,
-            subcategoryName = subcategoryName
+            explorerTitle = explorerTitle
         )
         val questionScreen = com.hathway.sproutelle.core.navigation.Screen.Question(
             explorerId = explorerId,
@@ -353,10 +376,8 @@ class LearningRepositoryTest {
             subcategoryName = subcategoryName
         )
 
-        assertEquals(explorerId, gameSelection.explorerId)
-        assertEquals(explorerTitle, gameSelection.explorerTitle)
-        assertEquals(subcategoryId, gameSelection.subcategoryId)
-        assertEquals(subcategoryName, gameSelection.subcategoryName)
+        assertEquals(explorerId, gamesScreen.explorerId)
+        assertEquals(explorerTitle, gamesScreen.explorerTitle)
 
         assertEquals(explorerId, questionScreen.explorerId)
         assertEquals(explorerTitle, questionScreen.explorerTitle)

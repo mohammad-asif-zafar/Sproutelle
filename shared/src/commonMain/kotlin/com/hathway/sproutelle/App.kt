@@ -16,15 +16,13 @@ import com.hathway.sproutelle.data.repository.UserPreferencesRepositoryImpl
 import com.hathway.sproutelle.domain.usecase.CheckOnboardingStatusUseCase
 import com.hathway.sproutelle.domain.usecase.CompleteOnboardingUseCase
 import com.hathway.sproutelle.domain.usecase.GetExplorerItemsUseCase
-import com.hathway.sproutelle.domain.usecase.GetGamesForSubcategoryUseCase
+import com.hathway.sproutelle.domain.usecase.GetGamesForExplorerUseCase
 import com.hathway.sproutelle.domain.usecase.GetHomeDataUseCase
 import com.hathway.sproutelle.domain.usecase.GetQuestionsUseCase
-import com.hathway.sproutelle.domain.usecase.GetSubcategoriesUseCase
-import com.hathway.sproutelle.presentation.games.GameSelectionScreen
-import com.hathway.sproutelle.presentation.games.GameSelectionUiState
-import com.hathway.sproutelle.presentation.games.GameSelectionViewModel
 import com.hathway.sproutelle.presentation.games.GameShellScreen
 import com.hathway.sproutelle.presentation.games.GameShellViewModel
+import com.hathway.sproutelle.presentation.games.GamesScreen
+import com.hathway.sproutelle.presentation.games.GamesViewModel
 import com.hathway.sproutelle.presentation.home.HomeScreen
 import com.hathway.sproutelle.presentation.home.HomeViewModel
 import com.hathway.sproutelle.presentation.onboarding.OnboardingScreen
@@ -33,8 +31,6 @@ import com.hathway.sproutelle.presentation.question.QuestionScreen
 import com.hathway.sproutelle.presentation.question.QuestionViewModel
 import com.hathway.sproutelle.presentation.splash.SplashScreen
 import com.hathway.sproutelle.presentation.splash.SplashViewModel
-import com.hathway.sproutelle.presentation.subcategory.SubcategoryScreen
-import com.hathway.sproutelle.presentation.subcategory.SubcategoryViewModel
 import theme.SproutelleTheme
 
 @Composable
@@ -54,8 +50,7 @@ fun App() {
     val getHomeDataUseCase = remember { GetHomeDataUseCase(homeRepository) }
     val getExplorerItemsUseCase = remember { GetExplorerItemsUseCase(explorerRepository) }
 
-    val getSubcategoriesUseCase = remember { GetSubcategoriesUseCase(learningRepository) }
-    val getGamesForSubcategoryUseCase = remember { GetGamesForSubcategoryUseCase(learningRepository) }
+    val getGamesForExplorerUseCase = remember { GetGamesForExplorerUseCase(learningRepository) }
     val getQuestionsUseCase = remember { GetQuestionsUseCase(learningRepository) }
 
     val splashViewModel = remember { SplashViewModel(checkOnboardingStatusUseCase) }
@@ -86,89 +81,48 @@ fun App() {
                 HomeScreen(
                     viewModel = homeViewModel,
                     onCategoryClick = { explorerItem ->
-                        learningRepository.preloadSubcategories(explorerItem.id)
-                        currentScreen = Screen.Subcategories(
+                        learningRepository.preloadGamesForExplorer(explorerItem.id)
+                        currentScreen = Screen.Games(
                             explorerId = explorerItem.id,
                             explorerTitle = explorerItem.titleName
                         )
                     }
                 )
             }
-            is Screen.Subcategories -> {
+            is Screen.Games -> {
                 SystemBackHandler {
                     currentScreen = Screen.Home
                 }
-                val subViewModel = remember(screen.explorerId) {
-                    SubcategoryViewModel(
+                val gamesViewModel = remember(screen.explorerId) {
+                    GamesViewModel(
                         explorerId = screen.explorerId,
                         explorerTitle = screen.explorerTitle,
                         learningRepository = learningRepository
                     )
                 }
-                SubcategoryScreen(
-                    viewModel = subViewModel,
+                GamesScreen(
+                    viewModel = gamesViewModel,
                     onBackClick = {
                         currentScreen = Screen.Home
                     },
-                    onSubcategoryClick = { subcategory ->
-                        learningRepository.preloadGames(subcategory.id)
-                        currentScreen = Screen.GameSelection(
-                            explorerId = screen.explorerId,
-                            explorerTitle = screen.explorerTitle,
-                            subcategoryId = subcategory.id,
-                            subcategoryName = subcategory.name
-                        )
-                    }
-                )
-            }
-            is Screen.GameSelection -> {
-                SystemBackHandler {
-                    currentScreen = Screen.Subcategories(
-                        explorerId = screen.explorerId,
-                        explorerTitle = screen.explorerTitle
-                    )
-                }
-                val gameViewModel = remember(screen.subcategoryId) {
-                    GameSelectionViewModel(
-                        explorerId = screen.explorerId,
-                        subcategoryId = screen.subcategoryId,
-                        subcategoryName = screen.subcategoryName,
-                        learningRepository = learningRepository
-                    )
-                }
-                GameSelectionScreen(
-                    viewModel = gameViewModel,
-                    onBackClick = {
-                        currentScreen = Screen.Subcategories(
-                            explorerId = screen.explorerId,
-                            explorerTitle = screen.explorerTitle
-                        )
-                    },
-                    onGameClick = { gameId, subcategoryId ->
-                        val selectedGameName = gameViewModel.uiState.value.let {
-                            if (it is GameSelectionUiState.Success) {
-                                it.games.find { g -> g.gameId == gameId }?.name ?: "Game"
-                            } else "Game"
-                        }
+                    onGameClick = { gameId, subcategoryId, gameName, subcategoryName ->
                         learningRepository.preloadQuestions(subcategoryId, gameId)
                         currentScreen = Screen.Question(
                             explorerId = screen.explorerId,
                             explorerTitle = screen.explorerTitle,
                             subcategoryId = subcategoryId,
                             gameId = gameId,
-                            gameName = selectedGameName,
-                            subcategoryName = screen.subcategoryName
+                            gameName = gameName,
+                            subcategoryName = subcategoryName
                         )
                     }
                 )
             }
             is Screen.Question -> {
                 SystemBackHandler {
-                    currentScreen = Screen.GameSelection(
+                    currentScreen = Screen.Games(
                         explorerId = screen.explorerId,
-                        explorerTitle = screen.explorerTitle,
-                        subcategoryId = screen.subcategoryId,
-                        subcategoryName = screen.subcategoryName
+                        explorerTitle = screen.explorerTitle
                     )
                 }
                 val questionViewModel = remember(screen.subcategoryId, screen.gameId) {
@@ -183,22 +137,18 @@ fun App() {
                 QuestionScreen(
                     viewModel = questionViewModel,
                     onBackClick = {
-                        currentScreen = Screen.GameSelection(
+                        currentScreen = Screen.Games(
                             explorerId = screen.explorerId,
-                            explorerTitle = screen.explorerTitle,
-                            subcategoryId = screen.subcategoryId,
-                            subcategoryName = screen.subcategoryName
+                            explorerTitle = screen.explorerTitle
                         )
                     }
                 )
             }
             is Screen.GameShell -> {
                 SystemBackHandler {
-                    currentScreen = Screen.GameSelection(
+                    currentScreen = Screen.Games(
                         explorerId = screen.explorerId,
-                        explorerTitle = screen.explorerTitle,
-                        subcategoryId = screen.subcategoryId,
-                        subcategoryName = screen.subcategoryName
+                        explorerTitle = screen.explorerTitle
                     )
                 }
                 val gameShellViewModel = remember(screen.subcategoryId, screen.gameId) {
@@ -211,11 +161,9 @@ fun App() {
                 GameShellScreen(
                     viewModel = gameShellViewModel,
                     onBackClick = {
-                        currentScreen = Screen.GameSelection(
+                        currentScreen = Screen.Games(
                             explorerId = screen.explorerId,
-                            explorerTitle = screen.explorerTitle,
-                            subcategoryId = screen.subcategoryId,
-                            subcategoryName = screen.subcategoryName
+                            explorerTitle = screen.explorerTitle
                         )
                     }
                 )
