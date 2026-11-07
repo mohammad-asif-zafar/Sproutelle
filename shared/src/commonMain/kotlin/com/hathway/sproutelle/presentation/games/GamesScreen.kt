@@ -1,17 +1,22 @@
 package com.hathway.sproutelle.presentation.games
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -20,10 +25,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hathway.sproutelle.core.responsive.ProvideWindowSizeClass
 import com.hathway.sproutelle.domain.model.GameItem
@@ -91,7 +98,8 @@ fun GamesScreen(
 }
 
 /**
- * Unified content view displaying all games in a single collection without subcategory headers.
+ * Unified content view matching the reference design:
+ * Header cloud banner with explorer title, back button, and adaptive child-safe grid.
  */
 @Composable
 private fun GamesContent(
@@ -119,12 +127,17 @@ private fun GamesContent(
                 .fillMaxSize()
                 .statusBarsPadding()
         ) {
-            // Top ~20% empty header area displaying the background illustration with the back button
+            // Large touch target header surface for toddlers who miss the exact button center
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(if (isTablet) 0.25f else 0.20f)
-                    .padding(headerPadding),
+                    .fillMaxHeight(if (isTablet) 0.3f else 0.3f)
+                    .padding(headerPadding)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = onBackClick
+                    ),
                 contentAlignment = Alignment.TopStart
             ) {
                 RoundedIconButton(
@@ -139,26 +152,51 @@ private fun GamesContent(
                     .weight(1f)
                     .padding(horizontal = contentPadding)
             ) {
-                Text(
-                    text = explorerTitle,
-                    style = titleStyle,
-                    color = SproutelleColors.Ink,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(bottom = SproutelleSpacing.Medium)
-                )
+                // Playful Rounded Cloud Title Banner with bold typography
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = SproutelleSpacing.Large),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(32.dp),
+                        color = Color.White,
+                        shadowElevation = 4.dp
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(horizontal = 28.dp, vertical = 12.dp)
+                        ) {
+                            Text("✨", fontSize = 18.sp)
+                            Text(
+                                text = explorerTitle,
+                                style = titleStyle.copy(lineHeight = 28.sp),
+                                color = Color(0xFF1B365D),
+                                fontWeight = FontWeight.Black
+                            )
+                            Text("✨", fontSize = 18.sp)
+                        }
+                    }
+                }
 
-                LazyColumn(
+                // Child-safe adaptive layout grid: Dynamically flows columns depending on device width layout
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(if (isTablet) 240.dp else 300.dp),
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(bottom = SproutelleSpacing.XXLarge),
-                    verticalArrangement = Arrangement.spacedBy(SproutelleSpacing.Medium)
+                    horizontalArrangement = Arrangement.spacedBy(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
-                    items(
+                    itemsIndexed(
                         items = allGamesWithSubcategory,
-                        key = { (game, _) -> game.assignmentId.ifEmpty { "${game.subcategoryId}_${game.gameId}" } }
-                    ) { (game, subcategoryName) ->
+                        key = { _, (game, _) -> game.assignmentId.ifEmpty { "${game.subcategoryId}_${game.gameId}" } }
+                    ) { index, (game, subcategoryName) ->
                         GameCard(
                             game = game,
                             isTablet = isTablet,
+                            cardIndex = index,
                             onClick = {
                                 onGameClick(game.gameId, game.subcategoryId, game.name, subcategoryName)
                             }
@@ -190,7 +228,7 @@ private fun MobileGamesContentPreview() {
     MaterialTheme {
         Surface(color = SproutelleColors.Cream) {
             GamesContent(
-                explorerTitle = "Math Quest",
+                explorerTitle = "Letters & Reading",
                 allGamesWithSubcategory = getMockGamesData(),
                 isTablet = false,
                 onBackClick = {},
@@ -200,14 +238,13 @@ private fun MobileGamesContentPreview() {
     }
 }
 
-
 @Preview(name = "Tablet Format", device = "spec:width=1280dp,height=800dp", showBackground = true)
 @Composable
 private fun TabletGamesContentPreview() {
     MaterialTheme {
         Surface(color = SproutelleColors.Cream) {
             GamesContent(
-                explorerTitle = "Math Quest Explorer",
+                explorerTitle = "Letters & Reading",
                 allGamesWithSubcategory = getMockGamesData(),
                 isTablet = true,
                 onBackClick = {},
@@ -222,24 +259,40 @@ private fun getMockGamesData() = listOf(
         assignmentId = "a1",
         subcategoryId = "sub_1",
         gameId = "1",
-        name = "Counting Stars",
-        slug = "counting-stars",
+        name = "Spelling Bee",
+        slug = "spelling-bee",
         description = null,
-        gameType = "quiz",
+        gameType = "spelling_bee",
         isPublished = true,
         sortOrder = 1,
-        isActive = true
-    ) to "Numbers",
+        isActive = true,
+        minAge = 3,
+        maxAge = 6
+    ) to "Letters",
     GameItem(
         assignmentId = "a2",
         subcategoryId = "sub_1",
         gameId = "2",
-        name = "Addition Puzzle",
-        slug = "addition-puzzle",
+        name = "Guess Game",
+        slug = "guess-game",
         description = null,
-        gameType = "quiz",
+        gameType = "image_selection",
         isPublished = true,
         sortOrder = 2,
         isActive = true
-    ) to "Numbers"
+    ) to "Letters",
+    GameItem(
+        assignmentId = "a3",
+        subcategoryId = "sub_1",
+        gameId = "3",
+        name = "Spelling Bee",
+        slug = "spelling-bee-2",
+        description = null,
+        gameType = "spelling_bee",
+        isPublished = true,
+        sortOrder = 3,
+        isActive = true,
+        minAge = 3,
+        maxAge = 6
+    ) to "Letters"
 )

@@ -44,17 +44,23 @@ class SupabaseLearningRemoteDataSource(
     override suspend fun fetchSubcategories(explorerId: String): Result<List<Subcategory>> {
         return try {
             val subcategoriesUrl = "${SupabaseConfig.SUPABASE_URL}/rest/v1/homescreen_explorer_subcategories?explorer_id=eq.$explorerId&is_active=eq.true&order=sort_order.asc"
+            println("SupabaseLearningRemoteDataSource: GET $subcategoriesUrl")
             val response: HttpResponse = client.get(subcategoriesUrl) {
                 header("apikey", SupabaseConfig.SUPABASE_ANON_KEY)
                 header(HttpHeaders.Authorization, "Bearer ${SupabaseConfig.SUPABASE_ANON_KEY}")
                 header(HttpHeaders.Accept, "application/json")
             }
 
-            if (response.status.value !in 200..299) {
-                return Result.failure(Exception("Failed to fetch subcategories: HTTP ${response.status.value}"))
+            val statusCode = response.status.value
+            val responseText = response.bodyAsText()
+            println("SupabaseLearningRemoteDataSource: HTTP $statusCode - $responseText")
+
+            if (statusCode !in 200..299) {
+                return Result.failure(Exception("Failed to fetch subcategories: HTTP $statusCode ($responseText)"))
             }
 
-            val subcategoryEntities: List<SubcategoryEntity> = response.body()
+            val jsonParser = Json { ignoreUnknownKeys = true; isLenient = true }
+            val subcategoryEntities: List<SubcategoryEntity> = jsonParser.decodeFromString(responseText)
 
             val assetIds = subcategoryEntities.mapNotNull { it.imageAssetId }.distinct()
             val mediaMap = if (assetIds.isNotEmpty()) {
@@ -90,7 +96,6 @@ class SupabaseLearningRemoteDataSource(
             }
 
             val signedUrlMap = mutableMapOf<String, String>()
-            val jsonParser = Json { ignoreUnknownKeys = true; isLenient = true }
 
             for ((bucketName, paths) in pathsByBucket) {
                 try {

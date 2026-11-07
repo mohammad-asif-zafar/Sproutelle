@@ -19,8 +19,10 @@ sealed interface QuestionUiState {
         val selectedOptionId: String? = null,
         val isOptionSubmitted: Boolean = false,
         val isCorrect: Boolean? = null,
+        val completedQuestionIndices: Set<Int> = emptySet(),
         val isAudioMuted: Boolean = false,
-        val isOffline: Boolean = false
+        val isOffline: Boolean = false,
+        val difficulty: String = "Hard"
     ) : QuestionUiState
     data class Error(val message: String) : QuestionUiState
     data object Empty : QuestionUiState
@@ -75,11 +77,19 @@ class QuestionViewModel(
         val current = _uiState.value as? QuestionUiState.Success ?: return
         val currentQuestion = current.questions.getOrNull(current.currentQuestionIndex) ?: return
         val option = currentQuestion.options.find { it.id == optionId }
+        val isCorrect = option?.isCorrect ?: false
+
+        val updatedCompleted = if (isCorrect) {
+            current.completedQuestionIndices + current.currentQuestionIndex
+        } else {
+            current.completedQuestionIndices
+        }
 
         _uiState.value = current.copy(
             selectedOptionId = optionId,
             isOptionSubmitted = true,
-            isCorrect = option?.isCorrect ?: false
+            isCorrect = isCorrect,
+            completedQuestionIndices = updatedCompleted
         )
     }
 

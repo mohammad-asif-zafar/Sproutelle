@@ -27,8 +27,8 @@ import com.hathway.sproutelle.presentation.home.HomeScreen
 import com.hathway.sproutelle.presentation.home.HomeViewModel
 import com.hathway.sproutelle.presentation.onboarding.OnboardingScreen
 import com.hathway.sproutelle.presentation.onboarding.OnboardingViewModel
-import com.hathway.sproutelle.presentation.question.QuestionScreen
-import com.hathway.sproutelle.presentation.question.QuestionViewModel
+import com.hathway.sproutelle.presentation.picturequest.PictureQuestScreen
+import com.hathway.sproutelle.presentation.picturequest.PictureQuestViewModel
 import com.hathway.sproutelle.presentation.splash.SplashScreen
 import com.hathway.sproutelle.presentation.splash.SplashViewModel
 import theme.SproutelleTheme
@@ -125,17 +125,17 @@ fun App() {
                         explorerTitle = screen.explorerTitle
                     )
                 }
-                val questionViewModel = remember(screen.subcategoryId, screen.gameId) {
-                    QuestionViewModel(
+                val pictureQuestViewModel = remember(screen.subcategoryId, screen.gameId) {
+                    PictureQuestViewModel(
                         explorerId = screen.explorerId,
                         subcategoryId = screen.subcategoryId,
                         gameId = screen.gameId,
-                        gameName = screen.gameName,
+                        gameName = screen.gameName.ifBlank { "Picture Quest" },
                         learningRepository = learningRepository
                     )
                 }
-                QuestionScreen(
-                    viewModel = questionViewModel,
+                PictureQuestScreen(
+                    viewModel = pictureQuestViewModel,
                     onBackClick = {
                         currentScreen = Screen.Games(
                             explorerId = screen.explorerId,

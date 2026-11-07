@@ -7,7 +7,9 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class ExplorerItemEntity(
     @SerialName("id") val id: String,
-    @SerialName("title_name") val titleName: String,
+    @SerialName("title_name") val titleName: String? = null,
+    @SerialName("title") val title: String? = null,
+    @SerialName("name") val name: String? = null,
     @SerialName("title_image_asset_id") val titleImageAssetId: String? = null,
     @SerialName("background_color") val backgroundColor: String = "#FFF0F3",
     @SerialName("category_id") val categoryId: String? = null,
@@ -15,9 +17,10 @@ data class ExplorerItemEntity(
     @SerialName("is_active") val isActive: Boolean = true
 ) {
     fun toDomain(mediaAsset: MediaAssetEntity?, imageAssetId: String?, signedUrl: String?, signedAt: Long = 0L): ExplorerItem {
+        val resolvedTitle = titleName?.ifBlank { null } ?: title?.ifBlank { null } ?: name ?: "Explore Category"
         return ExplorerItem(
             id = id,
-            titleName = titleName,
+            titleName = resolvedTitle,
             titleImageAssetId = imageAssetId,
             backgroundColor = backgroundColor,
             categoryId = categoryId,

@@ -49,17 +49,23 @@ class SupabaseExplorerRemoteDataSource : ExplorerRemoteDataSource {
     override suspend fun fetchExplorerItemsFromSupabase(): Result<List<ExplorerItem>> {
         return try {
             val explorerUrl = "${SupabaseConfig.SUPABASE_URL}/rest/v1/homescreen_explorer?is_active=eq.true&order=sort_order.asc"
+            println("SupabaseExplorerRemoteDataSource: GET $explorerUrl")
             val explorerHttpResponse: HttpResponse = client.get(explorerUrl) {
                 header("apikey", SupabaseConfig.SUPABASE_ANON_KEY)
                 header(HttpHeaders.Authorization, "Bearer ${SupabaseConfig.SUPABASE_ANON_KEY}")
                 header(HttpHeaders.Accept, "application/json")
             }
 
-            if (explorerHttpResponse.status.value !in 200..299) {
-                return Result.failure(Exception("Failed to fetch explorer items: HTTP ${explorerHttpResponse.status.value}"))
+            val statusCode = explorerHttpResponse.status.value
+            val responseText = explorerHttpResponse.bodyAsText()
+            println("SupabaseExplorerRemoteDataSource: HTTP $statusCode - $responseText")
+
+            if (statusCode !in 200..299) {
+                return Result.failure(Exception("Failed to fetch explorer items: HTTP $statusCode ($responseText)"))
             }
 
-            val explorerResponse: List<ExplorerItemEntity> = explorerHttpResponse.body()
+            val jsonParser = Json { ignoreUnknownKeys = true; isLenient = true }
+            val explorerResponse: List<ExplorerItemEntity> = jsonParser.decodeFromString(responseText)
 
             val assetIds = explorerResponse.mapNotNull { it.titleImageAssetId }.distinct()
             val mediaMap = if (assetIds.isNotEmpty()) {
@@ -96,7 +102,6 @@ class SupabaseExplorerRemoteDataSource : ExplorerRemoteDataSource {
             }
 
             val signedUrlMap = mutableMapOf<String, String>()
-            val jsonParser = Json { ignoreUnknownKeys = true; isLenient = true }
 
             for ((bucketName, paths) in pathsByBucket) {
                 try {

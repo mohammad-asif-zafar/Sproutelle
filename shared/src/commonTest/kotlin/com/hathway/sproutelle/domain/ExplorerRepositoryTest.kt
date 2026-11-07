@@ -381,4 +381,40 @@ class ExplorerRepositoryTest {
         assertEquals("Letters", homeData.categories[0].title)
         assertEquals("url1", homeData.categories[0].imageUrl)
     }
+
+    @Test
+    fun test16_PreservesRealUUIDsAndNoFabricatedFallbackIDs(): Unit = runBlocking {
+        val realUuid = "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+        val remoteItems = listOf(
+            ExplorerItem(
+                id = realUuid,
+                titleName = "Letters & Sounds",
+                titleImageAssetId = "asset1",
+                backgroundColor = "#E8F5E9",
+                categoryId = "cat_1",
+                sortOrder = 1,
+                isActive = true
+            )
+        )
+        val cache = FakeExplorerCacheStorage()
+        val remote = FakeExplorerRemoteDataSource(Result.success(remoteItems))
+        val repo = ExplorerRepositoryImpl(remote, cache)
+        repo.refreshExplorerItems()
+
+        val items = repo.getExplorerItems().first()
+        assertEquals(1, items.size)
+        assertEquals(realUuid, items[0].id, "The exact Supabase UUID must be preserved")
+        assertTrue(items.none { it.id.startsWith("exp_") }, "No fake fallback IDs should be emitted")
+    }
+
+    @Test
+    fun test17_EmptyResponseProducesEmptyStateNoFakeFallbackData(): Unit = runBlocking {
+        val cache = FakeExplorerCacheStorage()
+        val remote = FakeExplorerRemoteDataSource(Result.success(emptyList()))
+        val repo = ExplorerRepositoryImpl(remote, cache)
+        repo.refreshExplorerItems()
+
+        val items = repo.getExplorerItems().first()
+        assertTrue(items.isEmpty(), "Empty Supabase response must yield empty items list without fake fallbacks")
+    }
 }

@@ -320,61 +320,79 @@ fun SubcategoryCard(
     }
 }
 
+fun getPastelBgColor(index: Int): Color {
+    return when (index % 4) {
+        0 -> Color(0xFFFFF8E1) // Soft warm yellow
+        1 -> Color(0xFFF3E5F5) // Soft lavender / purple
+        2 -> Color(0xFFE1F5FE) // Soft sky blue
+        else -> Color(0xFFFCE4EC) // Soft pink
+    }
+}
+
 @Composable
 fun GameCard(
     game: GameItem,
     isTablet: Boolean,
+    cardIndex: Int = 0,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    if (isTablet) {
+        TabletGameCard(
+            game = game,
+            cardIndex = cardIndex,
+            onClick = onClick,
+            modifier = modifier
+        )
+    } else {
+        MobileGameCard(
+            game = game,
+            cardIndex = cardIndex,
+            onClick = onClick,
+            modifier = modifier
+        )
+    }
+}
+
+@Composable
+fun MobileGameCard(
+    game: GameItem,
+    cardIndex: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val cardBgColor = getPastelBgColor(cardIndex)
+
     val iconEmoji = when {
         game.name.contains("Star", ignoreCase = true) || game.name.contains("Count", ignoreCase = true) -> "⭐"
-        game.name.contains("Puzzle", ignoreCase = true) || game.name.contains("Match", ignoreCase = true) -> "🧩"
+        game.name.contains("Puzzle", ignoreCase = true) || game.name.contains("Match", ignoreCase = true) -> "🍎"
         game.gameType.lowercase() in listOf("garden_quiz", "quiz") -> "❓"
         game.gameType.lowercase() == "image_selection" -> "🖼️"
-        game.gameType.lowercase() == "spelling_bee" -> "🐝"
+        game.gameType.lowercase() == "spelling_bee" || game.name.contains("Bee", ignoreCase = true) -> "🐝"
         else -> "🎮"
     }
 
-    val typeBadgeText = when (game.gameType.lowercase()) {
-        "garden_quiz" -> "Garden Quiz"
+    val badgeText = if (game.minAge != null && game.maxAge != null) {
+        "Ages ${game.minAge}–${game.maxAge}"
+    } else when (game.gameType.lowercase()) {
         "image_selection" -> "Image Match"
         "spelling_bee" -> "Spelling Bee"
+        "garden_quiz" -> "Garden Quiz"
         else -> "Mini Game"
-    }
-
-    val thumbnailBgColor = when (iconEmoji) {
-        "⭐" -> Color(0xFFE8DEF8)
-        "🧩" -> Color(0xFFE1F5FE)
-        "🐝" -> Color(0xFFFFF9C4)
-        "❓" -> Color(0xFFFFE0B2)
-        else -> Color(0xFFE8F5E9)
-    }
-
-    val badgeBgColor = when (typeBadgeText) {
-        "Mini Game" -> Color(0xFFEDE7F6)
-        "Full Game" -> Color(0xFFFFF3E0)
-        else -> SproutelleColors.Peach
-    }
-
-    val badgeTextColor = when (typeBadgeText) {
-        "Mini Game" -> Color(0xFF673AB7)
-        "Full Game" -> Color(0xFFE65100)
-        else -> SproutelleColors.Ink
     }
 
     Card(
         modifier = modifier
             .fillMaxWidth()
             .clickable { onClick() },
-        colors = CardDefaults.cardColors(containerColor = SproutelleColors.White),
-        shape = RoundedCornerShape(24.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+        colors = CardDefaults.cardColors(containerColor = cardBgColor),
+        shape = RoundedCornerShape(26.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(if (isTablet) 18.dp else 14.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -385,75 +403,165 @@ fun GameCard(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(if (isTablet) 72.dp else 64.dp)
-                        .background(thumbnailBgColor, shape = RoundedCornerShape(18.dp)),
+                        .size(56.dp)
+                        .background(Color.White, shape = CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(iconEmoji, fontSize = if (isTablet) 36.sp else 30.sp)
+                    Text(iconEmoji, fontSize = 28.sp)
                 }
 
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
                         text = game.name,
-                        style = if (isTablet) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
-                        color = SproutelleColors.Ink,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color(0xFF1B365D),
                         fontWeight = FontWeight.Bold
                     )
 
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    Surface(
+                        shape = SproutelleShapes.Pill,
+                        color = Color.White.copy(alpha = 0.85f)
                     ) {
-                        Surface(
-                            shape = SproutelleShapes.Pill,
-                            color = badgeBgColor
-                        ) {
-                            Text(
-                                text = typeBadgeText,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = badgeTextColor,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 11.sp,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
-                            )
-                        }
-
-                        if (game.minAge != null && game.maxAge != null) {
-                            Surface(
-                                shape = SproutelleShapes.Pill,
-                                color = Color(0xFFFFEAD0)
-                            ) {
-                                Text(
-                                    text = "Ages ${game.minAge}–${game.maxAge}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Color(0xFFB35900),
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                )
-                            }
-                        }
+                        Text(
+                            text = badgeText,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFF333333),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
+                        )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.size(10.dp))
-
             Box(
                 modifier = Modifier
-                    .background(Color(0xFF4CAF50), shape = CircleShape)
-                    .size(if (isTablet) 48.dp else 42.dp),
+                    .size(42.dp)
+                    .background(Color(0xFF4CAF50), shape = CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = "▶",
-                    style = MaterialTheme.typography.titleMedium,
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
-                    fontSize = if (isTablet) 18.sp else 15.sp
+                    fontSize = 15.sp
                 )
+            }
+        }
+    }
+}
+
+@Composable
+fun TabletGameCard(
+    game: GameItem,
+    cardIndex: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val cardBgColor = getPastelBgColor(cardIndex)
+
+    val iconEmoji = when {
+        game.name.contains("Star", ignoreCase = true) || game.name.contains("Count", ignoreCase = true) -> "⭐"
+        game.name.contains("Puzzle", ignoreCase = true) || game.name.contains("Match", ignoreCase = true) -> "🍎"
+        game.gameType.lowercase() in listOf("garden_quiz", "quiz") -> "❓"
+        game.gameType.lowercase() == "image_selection" -> "🖼️"
+        game.gameType.lowercase() == "spelling_bee" || game.name.contains("Bee", ignoreCase = true) -> "🐝"
+        else -> "🎮"
+    }
+
+    val badgeText = if (game.minAge != null && game.maxAge != null) {
+        "Ages ${game.minAge}–${game.maxAge}"
+    } else when (game.gameType.lowercase()) {
+        "image_selection" -> "Image Match"
+        "spelling_bee" -> "Spelling Bee"
+        "garden_quiz" -> "Garden Quiz"
+        else -> "Mini Game"
+    }
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(230.dp)
+            .clickable { onClick() },
+        colors = CardDefaults.cardColors(containerColor = cardBgColor),
+        shape = RoundedCornerShape(32.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(iconEmoji, fontSize = 56.sp)
+            }
+
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    color = Color.White,
+                    shadowElevation = 1.dp
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp, horizontal = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = game.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color(0xFF1B365D),
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        shape = SproutelleShapes.Pill,
+                        color = Color.White.copy(alpha = 0.85f)
+                    ) {
+                        Text(
+                            text = badgeText,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color(0xFF333333),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .background(Color(0xFF4CAF50), shape = CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "▶",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                    }
+                }
             }
         }
     }
