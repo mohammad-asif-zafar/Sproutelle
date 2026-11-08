@@ -14,9 +14,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -56,13 +53,16 @@ import theme.SproutelleSpacing
 
 @Composable
 fun PictureQuestScreen(
-    viewModel: PictureQuestViewModel, onBackClick: () -> Unit, onHomeClick: () -> Unit = onBackClick
+    viewModel: PictureQuestViewModel,
+    onBackClick: () -> Unit,
+    onHomeClick: () -> Unit = onBackClick
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     ProvideWindowSizeClass { windowSize ->
         Surface(
-            modifier = Modifier.fillMaxSize(), color = Color(0xFFE0F7FA)
+            modifier = Modifier.fillMaxSize(),
+            color = Color(0xFFE0F7FA)
         ) {
             when (val state = uiState) {
                 is PictureQuestUiState.Loading -> {
@@ -166,13 +166,17 @@ private fun MobilePictureQuestContent(
     onNextQuestion: () -> Unit
 ) {
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val topTitleSpace = maxHeight * 0.08f
+        val topTitleSpace = maxHeight * 0.16f
+        val optionsCount = currentQuestion.options.size
 
+        // Single Master Scrolling Layout completely eliminates items getting cut off or hidden behind overlays
         Column(
-            modifier = Modifier.fillMaxSize().statusBarsPadding()
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = SproutelleDimens.MobileContentPadding),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Spacer(modifier = Modifier.height(topTitleSpace))
 
@@ -189,46 +193,57 @@ private fun MobilePictureQuestContent(
                 isTablet = false
             )
 
-            val options = currentQuestion.options
-            if (options.isNotEmpty()) {
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
-                    modifier = Modifier.fillMaxWidth().height(260.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    items(options) { option ->
-                        val isSelected = state.selectedOptionId == option.id
-                        SingleImageAnswerCard(
-                            option = option,
-                            isTablet = false,
-                            isSelected = isSelected,
-                            isCorrect = state.isCorrect,
-                            onClick = { onOptionSelect(option.id) })
+            // Dynamic Adaptive Row Slicing: Prevents layout flaws across irregular dataset lengths
+            val chunkedOptions = currentQuestion.options.chunked(if (optionsCount == 3) 1 else 2)
+
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                chunkedOptions.forEach { rowItems ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        rowItems.forEach { option ->
+                            val isSelected = state.selectedOptionId == option.id
+                            SingleImageAnswerCard(
+                                option = option,
+                                isSelected = isSelected,
+                                isCorrect = state.isCorrect,
+                                isTablet = false,
+                                onClick = { onOptionSelect(option.id) },
+                                modifier = Modifier.weight(1f) // Evenly spans columns perfectly
+                            )
+                        }
+                        // Invisible filler balancing odd counts tails
+                        if (rowItems.size < (if (optionsCount == 3) 1 else 2)) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
                     }
                 }
             }
 
             if (state.isCorrect != null) {
-                QuestFeedbackBannerImage(isCorrect = state.isCorrect)
+                QuestFeedbackBannerImage(
+                    isCorrect = state.isCorrect,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
             }
 
-            Spacer(modifier = Modifier.height(84.dp))
-        }
-
-        if (state.isCorrect == true) {
-            val isLastQuestion = state.currentQuestionIndex == state.questions.lastIndex
-            Surface(
-                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                    .navigationBarsPadding().padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
-                color = Color.Transparent
-            ) {
+            // Interactive Button embedded at the end of the scroll chain guarantees absolute safety visibility
+            if (state.isCorrect == true) {
+                val isLastQuestion = state.currentQuestionIndex == state.questions.lastIndex
                 Button(
                     onClick = onNextQuestion,
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
                     shape = RoundedCornerShape(24.dp),
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp),
-                    modifier = Modifier.fillMaxWidth().height(54.dp)
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(vertical = 12.dp)
+                        .height(54.dp)
                 ) {
                     Text(
                         text = if (isLastQuestion) "See My Results ➔" else "Next Question ➔",
@@ -238,19 +253,21 @@ private fun MobilePictureQuestContent(
                         fontSize = 18.sp
                     )
                 }
+            } else {
+                Spacer(modifier = Modifier.height(32.dp))
             }
         }
-
         QuestHeader(
             difficulty = state.difficulty,
             onBackClick = onBackClick,
             onHomeClick = onHomeClick,
-            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding()
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .statusBarsPadding()
                 .padding(horizontal = 12.dp, vertical = 4.dp)
         )
     }
 }
-
 @Composable
 private fun TabletPictureQuestContent(
     state: PictureQuestUiState.Success,
@@ -262,10 +279,11 @@ private fun TabletPictureQuestContent(
     onNextQuestion: () -> Unit
 ) {
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val topTitleSpace = maxHeight * 0.10f
-
+        val topTitleSpace = maxHeight * 0.20f
         Column(
-            modifier = Modifier.fillMaxSize().statusBarsPadding()
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
                 .padding(horizontal = SproutelleDimens.TabletContentPadding)
                 .padding(bottom = SproutelleSpacing.Large),
             verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -277,46 +295,68 @@ private fun TabletPictureQuestContent(
                 completedIndices = state.completedQuestionIndices
             )
             Row(
-                modifier = Modifier.fillMaxWidth().weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(20.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(24.dp)
             ) {
                 Column(
-                    modifier = Modifier.weight(0.42f).fillMaxHeight(),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                    modifier = Modifier
+                        .weight(0.40f)
+                        .fillMaxHeight(),
+                    verticalArrangement = Arrangement.Top
                 ) {
                     PictureQuestQuestionCard(
                         question = currentQuestion,
                         isAudioMuted = state.isAudioMuted,
                         onAudioToggle = onAudioToggle,
-                        isTablet = true,
-                        modifier = Modifier.weight(1f)
+                        isTablet = true
                     )
                 }
                 Column(
-                    modifier = Modifier.weight(0.58f).fillMaxHeight(),
+                    modifier = Modifier
+                        .weight(0.60f)
+                        .fillMaxHeight(),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     val options = currentQuestion.options
-                    if (options.isNotEmpty()) {
-                        LazyVerticalGrid(
-                            columns = GridCells.Fixed(3),
-                            modifier = Modifier.fillMaxWidth().weight(1f),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            items(options) { option ->
-                                val isSelected = state.selectedOptionId == option.id
-                                SingleImageAnswerCard(
-                                    option = option,
-                                    isTablet = true,
-                                    isSelected = isSelected,
-                                    isCorrect = state.isCorrect,
-                                    onClick = { onOptionSelect(option.id) })
+                    val chunkedOptions = options.chunked(if (options.size <= 4) 2 else 3)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        chunkedOptions.forEach { rowItems ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(14.dp)
+                            ) {
+                                rowItems.forEach { option ->
+                                    val isSelected = state.selectedOptionId == option.id
+                                    SingleImageAnswerCard(
+                                        option = option,
+                                        isTablet = true,
+                                        isSelected = isSelected,
+                                        isCorrect = state.isCorrect,
+                                        onClick = { onOptionSelect(option.id) },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                                if (rowItems.size < (if (options.size <= 4) 2 else 3)) {
+                                    repeat((if (options.size <= 4) 2 else 3) - rowItems.size) {
+                                        Spacer(modifier = Modifier.weight(1f))
+                                    }
+                                }
                             }
                         }
                     }
                     if (state.isCorrect != null) {
-                        QuestFeedbackBannerImage(isCorrect = state.isCorrect)
+                        QuestFeedbackBannerImage(
+                            isCorrect = state.isCorrect,
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        )
                     }
                     if (state.isCorrect == true) {
                         val isLastQuestion = state.currentQuestionIndex == state.questions.lastIndex
@@ -325,7 +365,10 @@ private fun TabletPictureQuestContent(
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
                             shape = RoundedCornerShape(24.dp),
                             elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp),
-                            modifier = Modifier.fillMaxWidth().navigationBarsPadding().height(54.dp)
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .navigationBarsPadding()
+                                .height(56.dp)
                         ) {
                             Text(
                                 text = if (isLastQuestion) "See My Results ➔" else "Next Question ➔",
@@ -343,12 +386,13 @@ private fun TabletPictureQuestContent(
             difficulty = state.difficulty,
             onBackClick = onBackClick,
             onHomeClick = onHomeClick,
-            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding()
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .statusBarsPadding()
                 .padding(horizontal = SproutelleDimens.TabletContentPadding, vertical = 4.dp)
         )
     }
 }
-
 
 // ==========================================
 // PREVIEWS WITH REALISTIC MOCK DATA
