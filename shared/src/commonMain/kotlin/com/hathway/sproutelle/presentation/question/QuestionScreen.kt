@@ -7,7 +7,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -45,7 +44,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -57,7 +55,6 @@ import com.hathway.sproutelle.presentation.components.EmptyState
 import com.hathway.sproutelle.presentation.components.ErrorState
 import com.hathway.sproutelle.presentation.components.LoadingState
 import com.hathway.sproutelle.presentation.components.RoundedIconButton
-import theme.SproutelleColors
 import theme.SproutelleDimens
 import theme.SproutelleShapes
 import theme.SproutelleSpacing

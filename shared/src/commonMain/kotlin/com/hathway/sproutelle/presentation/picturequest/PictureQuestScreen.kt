@@ -1,46 +1,52 @@
 package com.hathway.sproutelle.presentation.picturequest
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.Spring
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil3.compose.AsyncImage
 import com.hathway.sproutelle.core.responsive.ProvideWindowSizeClass
 import com.hathway.sproutelle.domain.model.Question
 import com.hathway.sproutelle.domain.model.QuestionOption
 import com.hathway.sproutelle.presentation.components.EmptyState
 import com.hathway.sproutelle.presentation.components.ErrorState
-import com.hathway.sproutelle.presentation.components.GameLevelBadge
 import com.hathway.sproutelle.presentation.components.LoadingState
-import com.hathway.sproutelle.presentation.components.RoundedIconButton
-import com.hathway.sproutelle.presentation.components.SproutelleHomeButton
+import com.hathway.sproutelle.presentation.components.PictureQuestQuestionCard
+import com.hathway.sproutelle.presentation.components.QuestFeedbackBannerImage
+import com.hathway.sproutelle.presentation.components.QuestHeader
+import com.hathway.sproutelle.presentation.components.QuestProgressBar
+import com.hathway.sproutelle.presentation.components.SingleImageAnswerCard
 import org.jetbrains.compose.resources.painterResource
 import sproutelle.shared.generated.resources.Picture_Quest_bg_mobile
 import sproutelle.shared.generated.resources.Picture_Quest_bg_tablet
@@ -50,26 +56,23 @@ import theme.SproutelleSpacing
 
 @Composable
 fun PictureQuestScreen(
-    viewModel: PictureQuestViewModel,
-    onBackClick: () -> Unit
+    viewModel: PictureQuestViewModel, onBackClick: () -> Unit, onHomeClick: () -> Unit = onBackClick
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     ProvideWindowSizeClass { windowSize ->
         Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = Color(0xFFE0F7FA)
+            modifier = Modifier.fillMaxSize(), color = Color(0xFFE0F7FA)
         ) {
             when (val state = uiState) {
                 is PictureQuestUiState.Loading -> {
                     LoadingState(message = "Loading Picture Quest...")
                 }
+
                 is PictureQuestUiState.Error -> {
-                    ErrorState(
-                        message = state.message,
-                        onRetryClick = viewModel::refresh
-                    )
+                    ErrorState(message = state.message, onRetryClick = viewModel::refresh)
                 }
+
                 is PictureQuestUiState.Empty -> {
                     EmptyState(
                         message = "No questions available for Picture Quest yet",
@@ -78,6 +81,7 @@ fun PictureQuestScreen(
                         onActionClick = viewModel::refresh
                     )
                 }
+
                 is PictureQuestUiState.Success -> {
                     val currentQuestion = state.questions.getOrNull(state.currentQuestionIndex)
                     if (currentQuestion == null) {
@@ -93,6 +97,7 @@ fun PictureQuestScreen(
                             currentQuestion = currentQuestion,
                             isTablet = windowSize.isTablet,
                             onBackClick = onBackClick,
+                            onHomeClick = onHomeClick,
                             onAudioToggle = viewModel::toggleAudioMute,
                             onOptionSelect = viewModel::selectOption,
                             onNextQuestion = viewModel::nextQuestion
@@ -110,11 +115,13 @@ private fun PictureQuestAdaptiveLayout(
     currentQuestion: Question,
     isTablet: Boolean,
     onBackClick: () -> Unit,
+    onHomeClick: () -> Unit,
     onAudioToggle: () -> Unit,
     onOptionSelect: (String) -> Unit,
     onNextQuestion: () -> Unit
 ) {
-    val backgroundImage = if (isTablet) Res.drawable.Picture_Quest_bg_tablet else Res.drawable.Picture_Quest_bg_mobile
+    val backgroundImage =
+        if (isTablet) Res.drawable.Picture_Quest_bg_tablet else Res.drawable.Picture_Quest_bg_mobile
 
     Box(modifier = Modifier.fillMaxSize()) {
         Image(
@@ -129,6 +136,7 @@ private fun PictureQuestAdaptiveLayout(
                 state = state,
                 currentQuestion = currentQuestion,
                 onBackClick = onBackClick,
+                onHomeClick = onHomeClick,
                 onAudioToggle = onAudioToggle,
                 onOptionSelect = onOptionSelect,
                 onNextQuestion = onNextQuestion
@@ -138,6 +146,7 @@ private fun PictureQuestAdaptiveLayout(
                 state = state,
                 currentQuestion = currentQuestion,
                 onBackClick = onBackClick,
+                onHomeClick = onHomeClick,
                 onAudioToggle = onAudioToggle,
                 onOptionSelect = onOptionSelect,
                 onNextQuestion = onNextQuestion
@@ -151,29 +160,28 @@ private fun MobilePictureQuestContent(
     state: PictureQuestUiState.Success,
     currentQuestion: Question,
     onBackClick: () -> Unit,
+    onHomeClick: () -> Unit,
     onAudioToggle: () -> Unit,
     onOptionSelect: (String) -> Unit,
     onNextQuestion: () -> Unit
 ) {
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val topTitleSpace = maxHeight * 0.10f
+        val topTitleSpace = maxHeight * 0.08f
 
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
+            modifier = Modifier.fillMaxSize().statusBarsPadding()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = SproutelleDimens.MobileContentPadding)
-                .padding(bottom = SproutelleSpacing.XLarge),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(horizontal = SproutelleDimens.MobileContentPadding),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Spacer(modifier = Modifier.height(topTitleSpace))
 
-            PictureQuestProgressBar(
+            QuestProgressBar(
                 currentQuestionIndex = state.currentQuestionIndex,
                 totalQuestions = state.questions.size,
                 completedIndices = state.completedQuestionIndices
             )
+
             PictureQuestQuestionCard(
                 question = currentQuestion,
                 isAudioMuted = state.isAudioMuted,
@@ -185,41 +193,45 @@ private fun MobilePictureQuestContent(
             if (options.isNotEmpty()) {
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(2),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(340.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier.fillMaxWidth().height(260.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(options) { option ->
                         val isSelected = state.selectedOptionId == option.id
-                        PictureAnswerCard(
+                        SingleImageAnswerCard(
                             option = option,
+                            isTablet = false,
                             isSelected = isSelected,
                             isCorrect = state.isCorrect,
-                            onClick = { onOptionSelect(option.id) }
-                        )
+                            onClick = { onOptionSelect(option.id) })
                     }
                 }
             }
 
-            // In between question options and next question view
             if (state.isCorrect != null) {
-                Spacer(modifier = Modifier.height(4.dp))
-                PictureQuestFeedbackBanner(isCorrect = state.isCorrect)
+                QuestFeedbackBannerImage(isCorrect = state.isCorrect)
             }
 
-            if (state.isCorrect == true) {
-                Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(84.dp))
+        }
+
+        if (state.isCorrect == true) {
+            val isLastQuestion = state.currentQuestionIndex == state.questions.lastIndex
+            Surface(
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                    .navigationBarsPadding().padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+                color = Color.Transparent
+            ) {
                 Button(
                     onClick = onNextQuestion,
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
                     shape = RoundedCornerShape(24.dp),
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp),
                     modifier = Modifier.fillMaxWidth().height(54.dp)
                 ) {
                     Text(
-                        text = if (state.currentQuestionIndex == state.questions.lastIndex) "Finish Game 🎉" else "Next Question ➔",
+                        text = if (isLastQuestion) "See My Results ➔" else "Next Question ➔",
                         style = MaterialTheme.typography.titleMedium,
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
@@ -229,13 +241,12 @@ private fun MobilePictureQuestContent(
             }
         }
 
-        PictureQuestHeader(
+        QuestHeader(
             difficulty = state.difficulty,
             onBackClick = onBackClick,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .statusBarsPadding()
-                .padding(horizontal = 8.dp, vertical = 2.dp)
+            onHomeClick = onHomeClick,
+            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding()
+                .padding(horizontal = 12.dp, vertical = 4.dp)
         )
     }
 }
@@ -245,36 +256,33 @@ private fun TabletPictureQuestContent(
     state: PictureQuestUiState.Success,
     currentQuestion: Question,
     onBackClick: () -> Unit,
+    onHomeClick: () -> Unit,
     onAudioToggle: () -> Unit,
     onOptionSelect: (String) -> Unit,
     onNextQuestion: () -> Unit
 ) {
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val topTitleSpace = maxHeight * 0.12f
+        val topTitleSpace = maxHeight * 0.10f
 
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
+            modifier = Modifier.fillMaxSize().statusBarsPadding()
                 .padding(horizontal = SproutelleDimens.TabletContentPadding)
                 .padding(bottom = SproutelleSpacing.Large),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Spacer(modifier = Modifier.height(topTitleSpace))
-
-            PictureQuestProgressBar(
+            QuestProgressBar(
                 currentQuestionIndex = state.currentQuestionIndex,
                 totalQuestions = state.questions.size,
                 completedIndices = state.completedQuestionIndices
             )
-
             Row(
                 modifier = Modifier.fillMaxWidth().weight(1f),
                 horizontalArrangement = Arrangement.spacedBy(20.dp)
             ) {
                 Column(
                     modifier = Modifier.weight(0.42f).fillMaxHeight(),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     PictureQuestQuestionCard(
                         question = currentQuestion,
@@ -284,46 +292,43 @@ private fun TabletPictureQuestContent(
                         modifier = Modifier.weight(1f)
                     )
                 }
-
                 Column(
                     modifier = Modifier.weight(0.58f).fillMaxHeight(),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     val options = currentQuestion.options
                     if (options.isNotEmpty()) {
                         LazyVerticalGrid(
                             columns = GridCells.Fixed(3),
                             modifier = Modifier.fillMaxWidth().weight(1f),
-                            horizontalArrangement = Arrangement.spacedBy(14.dp),
-                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             items(options) { option ->
                                 val isSelected = state.selectedOptionId == option.id
-                                PictureAnswerCard(
+                                SingleImageAnswerCard(
                                     option = option,
+                                    isTablet = true,
                                     isSelected = isSelected,
                                     isCorrect = state.isCorrect,
-                                    onClick = { onOptionSelect(option.id) }
-                                )
+                                    onClick = { onOptionSelect(option.id) })
                             }
                         }
                     }
-
-                    // In between question options and next question view
                     if (state.isCorrect != null) {
-                        PictureQuestFeedbackBanner(isCorrect = state.isCorrect)
+                        QuestFeedbackBannerImage(isCorrect = state.isCorrect)
                     }
-
                     if (state.isCorrect == true) {
+                        val isLastQuestion = state.currentQuestionIndex == state.questions.lastIndex
                         Button(
                             onClick = onNextQuestion,
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
                             shape = RoundedCornerShape(24.dp),
                             elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp),
-                            modifier = Modifier.fillMaxWidth().height(56.dp)
+                            modifier = Modifier.fillMaxWidth().navigationBarsPadding().height(54.dp)
                         ) {
                             Text(
-                                text = if (state.currentQuestionIndex == state.questions.lastIndex) "Finish Game 🎉" else "Next Question ➔",
+                                text = if (isLastQuestion) "See My Results ➔" else "Next Question ➔",
                                 style = MaterialTheme.typography.titleMedium,
                                 color = Color.White,
                                 fontWeight = FontWeight.Bold,
@@ -334,380 +339,26 @@ private fun TabletPictureQuestContent(
                 }
             }
         }
-
-        PictureQuestHeader(
+        QuestHeader(
             difficulty = state.difficulty,
             onBackClick = onBackClick,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .statusBarsPadding()
+            onHomeClick = onHomeClick,
+            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding()
                 .padding(horizontal = SproutelleDimens.TabletContentPadding, vertical = 4.dp)
         )
     }
 }
 
-@Composable
-private fun PictureQuestHeader(
-    difficulty: String,
-    onBackClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Top
-    ) {
-        // Direct integration of SproutelleHomeButton with oversized tap padding & 48dp header size
-        SproutelleHomeButton(
-            onClick = onBackClick,
-            contentPadding = PaddingValues(0.dp),
-            buttonSize = 48.dp
-        )
-
-        val badgeModifier = Modifier.padding(top = 4.dp)
-
-        // Dynamic adaptive Level Badge integration
-        when (difficulty.trim().lowercase()) {
-            "easy" -> GameLevelBadge(
-                levelText = "Easy",
-                icon = "🌱",
-                modifier = badgeModifier,
-                backgroundColor = Color(0xFFE8F5E9),
-                borderColor = Color(0xFF81C784),
-                textColor = Color(0xFF2E7D32)
-            )
-            "medium" -> GameLevelBadge(
-                levelText = "Medium",
-                icon = "⚡",
-                modifier = badgeModifier,
-                backgroundColor = Color(0xFFFFE0B2),
-                borderColor = Color(0xFFFFB74D),
-                textColor = Color(0xFFE65100)
-            )
-            else -> GameLevelBadge(
-                levelText = "Hard",
-                icon = "⭐",
-                modifier = badgeModifier,
-                backgroundColor = Color(0xFFFFF493),
-                borderColor = Color(0xFFFBC02D),
-                textColor = Color(0xFF5D4037)
-            )
-        }
-    }
-}
-
-@Composable
-private fun PictureQuestProgressBar(
-    currentQuestionIndex: Int,
-    totalQuestions: Int,
-    completedIndices: Set<Int>
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        color = Color.White.copy(alpha = 0.9f),
-        shadowElevation = 2.dp
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Ques: ${currentQuestionIndex + 1} of $totalQuestions",
-                style = MaterialTheme.typography.titleMedium,
-                color = Color(0xFF1B365D),
-                fontWeight = FontWeight.Bold
-            )
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                repeat(totalQuestions) { index ->
-                    when {
-                        completedIndices.contains(index) -> {
-                            Box(
-                                modifier = Modifier.size(20.dp).background(Color(0xFF4CAF50), shape = CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text("✓", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                        index == currentQuestionIndex -> {
-                            Box(
-                                modifier = Modifier.size(22.dp).background(Color(0xFF0288D1), shape = CircleShape).border(2.dp, Color.White, CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Box(modifier = Modifier.size(8.dp).background(Color.White, shape = CircleShape))
-                            }
-                        }
-                        else -> {
-                            Box(modifier = Modifier.size(16.dp).background(Color(0xFFCFD8DC), shape = CircleShape))
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PictureQuestQuestionCard(
-    question: Question,
-    isAudioMuted: Boolean,
-    onAudioToggle: () -> Unit,
-    isTablet: Boolean,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier.fillMaxWidth().height(if (isTablet) 200.dp else 160.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(32.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-    ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-
-            Row(
-                modifier = Modifier.fillMaxSize().padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Box(
-                    modifier = Modifier.size(if (isTablet) 72.dp else 60.dp).background(Color(0xFFE1F5FE), shape = RoundedCornerShape(18.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    QuestionImageIllustration(imageUrl = question.imageUrl, text = question.text)
-                }
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Column(
-                    modifier = Modifier.weight(1f),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Text(
-                        text = "Which one is a",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFF0288D1),
-                        fontWeight = FontWeight.SemiBold
-                    )
-
-                    Text(
-                        text = question.text.uppercase(),
-                        style = if (isTablet) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.headlineMedium,
-                        color = Color(0xFF0D47A1),
-                        fontWeight = FontWeight.Black,
-                        textAlign = TextAlign.Center
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .background(if (isAudioMuted) Color(0xFFFFCC80) else Color(0xFF29B6F6), shape = CircleShape)
-                        .clickable { onAudioToggle() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = if (isAudioMuted) "🔇" else "🔊",
-                        fontSize = 20.sp,
-                        color = Color.White
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PictureAnswerCard(
-    option: QuestionOption,
-    isSelected: Boolean,
-    isCorrect: Boolean?,
-    onClick: () -> Unit
-) {
-    val borderColor by animateColorAsState(
-        targetValue = when {
-            isSelected && isCorrect == true -> Color(0xFF4CAF50)
-            isSelected && isCorrect == false -> Color(0xFFE53935)
-            else -> Color(0xFFE0E0E0)
-        }
-    )
-
-    val containerColor by animateColorAsState(
-        targetValue = when {
-            isSelected && isCorrect == true -> Color(0xFFE8F5E9)
-            isSelected && isCorrect == false -> Color(0xFFFFEBEE)
-            else -> Color.White
-        }
-    )
-
-    val pictureEmoji = getPictureEmoji(option.text)
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(100.dp)
-            .border(
-                width = if (isSelected) 3.dp else 1.dp,
-                color = borderColor,
-                shape = RoundedCornerShape(22.dp)
-            )
-            .clickable { onClick() },
-        colors = CardDefaults.cardColors(containerColor = containerColor),
-        shape = RoundedCornerShape(22.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            if (!option.imageUrl.isNullOrBlank()) {
-                AsyncImage(
-                    model = option.imageUrl,
-                    contentDescription = option.text,
-                    modifier = Modifier.size(60.dp).clip(RoundedCornerShape(12.dp)),
-                    contentScale = ContentScale.Fit
-                )
-            } else {
-                Text(pictureEmoji, fontSize = 42.sp)
-            }
-
-            if (isSelected) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(8.dp)
-                        .size(24.dp)
-                        .background(if (isCorrect == true) Color(0xFF4CAF50) else Color(0xFFE53935), shape = CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = if (isCorrect == true) "✓" else "✕",
-                        color = Color.White,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PictureQuestFeedbackBanner(
-    isCorrect: Boolean,
-    modifier: Modifier = Modifier
-) {
-    val scaleAnim = remember { Animatable(0.85f) }
-
-    LaunchedEffect(isCorrect) {
-        scaleAnim.animateTo(
-            targetValue = 1.0f,
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessLow
-            )
-        )
-    }
-
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .scale(scaleAnim.value),
-        shape = RoundedCornerShape(24.dp),
-        color = if (isCorrect) Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
-        shadowElevation = 3.dp
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text(
-                text = if (isCorrect) "🦊" else "🤔",
-                fontSize = 38.sp
-            )
-
-            Column(modifier = Modifier.weight(1f)) {
-                Surface(
-                    shape = RoundedCornerShape(50.dp),
-                    color = if (isCorrect) Color(0xFF4CAF50) else Color(0xFFE53935)
-                ) {
-                    Text(
-                        text = if (isCorrect) "Great Job! ⭐" else "Try Again!",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Text(
-                    text = if (isCorrect) "You found the right picture!" else "That's not correct. Look again and choose the right picture!",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (isCorrect) Color(0xFF1B5E20) else Color(0xFFC62828),
-                    fontWeight = FontWeight.Medium
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun QuestionImageIllustration(imageUrl: String?, text: String) {
-    var isError by remember { mutableStateOf(false) }
-
-    if (!imageUrl.isNullOrBlank() && !isError) {
-        AsyncImage(
-            model = imageUrl,
-            contentDescription = "Question Image",
-            modifier = Modifier.size(48.dp).clip(RoundedCornerShape(10.dp)),
-            contentScale = ContentScale.Fit,
-            onError = { isError = true }
-        )
-    }
-
-    if (imageUrl.isNullOrBlank() || isError) {
-        Text(getPictureEmoji(text), fontSize = 32.sp)
-    }
-}
-
-private fun getPictureEmoji(text: String): String {
-    val clean = text.lowercase()
-    return when {
-        clean.contains("mushroom") -> "🍄"
-        clean.contains("chili") || clean.contains("pepper") -> "🌶️"
-        clean.contains("pumpkin") -> "🎃"
-        clean.contains("pear") -> "🍐"
-        clean.contains("orange") -> "🍊"
-        clean.contains("mango") -> "🥭"
-        clean.contains("apple") -> "🍎"
-        clean.contains("banana") -> "🍌"
-        clean.contains("strawberry") -> "🍓"
-        clean.contains("watermelon") -> "🍉"
-        clean.contains("dog") -> "🐶"
-        clean.contains("cat") -> "🐱"
-        clean.contains("lion") -> "🦁"
-        clean.contains("bear") -> "🐻"
-        clean.contains("car") -> "🚗"
-        clean.contains("plane") -> "✈️"
-        clean.contains("star") -> "⭐"
-        clean.contains("ball") -> "⚽"
-        else -> "🖼️"
-    }
-}
 
 // ==========================================
 // PREVIEWS WITH REALISTIC MOCK DATA
 // ==========================================
 
-@Preview(name = "Mobile Portrait - Question Unanswered", device = "spec:width=411dp,height=891dp", showBackground = true)
+@Preview(
+    name = "Mobile Portrait - Question Unanswered",
+    device = "spec:width=411dp,height=891dp",
+    showBackground = true
+)
 @Composable
 private fun MobilePictureQuestPreview() {
     val mockState = PictureQuestUiState.Success(
@@ -727,14 +378,18 @@ private fun MobilePictureQuestPreview() {
             currentQuestion = mockState.questions[0],
             isTablet = false,
             onBackClick = {},
+            onHomeClick = {},
             onAudioToggle = {},
             onOptionSelect = {},
-            onNextQuestion = {}
-        )
+            onNextQuestion = {})
     }
 }
 
-@Preview(name = "Mobile Portrait - Answer Correct", device = "spec:width=411dp,height=891dp", showBackground = true)
+@Preview(
+    name = "Mobile Portrait - Answer Correct",
+    device = "spec:width=411dp,height=891dp",
+    showBackground = true
+)
 @Composable
 private fun MobilePictureQuestCorrectPreview() {
     val mockState = PictureQuestUiState.Success(
@@ -754,14 +409,18 @@ private fun MobilePictureQuestCorrectPreview() {
             currentQuestion = mockState.questions[0],
             isTablet = false,
             onBackClick = {},
+            onHomeClick = {},
             onAudioToggle = {},
             onOptionSelect = {},
-            onNextQuestion = {}
-        )
+            onNextQuestion = {})
     }
 }
 
-@Preview(name = "Mobile Portrait - Answer Incorrect", device = "spec:width=411dp,height=891dp", showBackground = true)
+@Preview(
+    name = "Mobile Portrait - Answer Incorrect",
+    device = "spec:width=411dp,height=891dp",
+    showBackground = true
+)
 @Composable
 private fun MobilePictureQuestIncorrectPreview() {
     val mockState = PictureQuestUiState.Success(
@@ -781,14 +440,18 @@ private fun MobilePictureQuestIncorrectPreview() {
             currentQuestion = mockState.questions[0],
             isTablet = false,
             onBackClick = {},
+            onHomeClick = {},
             onAudioToggle = {},
             onOptionSelect = {},
-            onNextQuestion = {}
-        )
+            onNextQuestion = {})
     }
 }
 
-@Preview(name = "Tablet Landscape - Question Unanswered", device = "spec:width=1280dp,height=800dp,orientation=landscape", showBackground = true)
+@Preview(
+    name = "Tablet Landscape - Question Unanswered",
+    device = "spec:width=1280dp,height=800dp,orientation=landscape",
+    showBackground = true
+)
 @Composable
 private fun TabletPictureQuestPreview() {
     val mockState = PictureQuestUiState.Success(
@@ -808,14 +471,18 @@ private fun TabletPictureQuestPreview() {
             currentQuestion = mockState.questions[0],
             isTablet = true,
             onBackClick = {},
+            onHomeClick = {},
             onAudioToggle = {},
             onOptionSelect = {},
-            onNextQuestion = {}
-        )
+            onNextQuestion = {})
     }
 }
 
-@Preview(name = "Tablet Landscape - Answer Correct", device = "spec:width=1280dp,height=800dp,orientation=landscape", showBackground = true)
+@Preview(
+    name = "Tablet Landscape - Answer Correct",
+    device = "spec:width=1280dp,height=800dp,orientation=landscape",
+    showBackground = true
+)
 @Composable
 private fun TabletPictureQuestCorrectPreview() {
     val mockState = PictureQuestUiState.Success(
@@ -835,10 +502,10 @@ private fun TabletPictureQuestCorrectPreview() {
             currentQuestion = mockState.questions[0],
             isTablet = true,
             onBackClick = {},
+            onHomeClick = {},
             onAudioToggle = {},
             onOptionSelect = {},
-            onNextQuestion = {}
-        )
+            onNextQuestion = {})
     }
 }
 
