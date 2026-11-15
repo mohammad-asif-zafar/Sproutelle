@@ -1,9 +1,15 @@
 package com.hathway.sproutelle.presentation.games
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -11,7 +17,20 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
@@ -36,6 +55,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -54,9 +77,16 @@ import org.jetbrains.compose.resources.painterResource
 import sproutelle.shared.generated.resources.Res
 import sproutelle.shared.generated.resources.Subcategories_bg_mobile
 import sproutelle.shared.generated.resources.Subcategories_bg_tablet
+import sproutelle.shared.generated.resources.ic_game_addition_adventure
+import sproutelle.shared.generated.resources.ic_game_match_discover
+import sproutelle.shared.generated.resources.ic_game_number_quest
+import sproutelle.shared.generated.resources.ic_game_picture_finder
+import sproutelle.shared.generated.resources.ic_game_picture_quest
+import sproutelle.shared.generated.resources.ic_game_word_builder
 import theme.SproutelleColors
 import theme.SproutelleDimens
 import theme.SproutelleSpacing
+
 
 @Composable
 fun GamesScreen(
@@ -156,65 +186,127 @@ private fun GamesContent(
         Column(
             modifier = Modifier.fillMaxSize().statusBarsPadding()
         ) {
-            // Top Navigation Row with generous toddler touch area
+
+            // Top Navigation Row with zero extra top padding
+            val touchZoneSize = if (isTablet) 68.dp else 60.dp
+            val visualButtonSize = if (isTablet) 52.dp else 46.dp
+            val backInteractionSource = remember { MutableInteractionSource() }
+
             Row(
-                modifier = Modifier.fillMaxWidth()
-                    .padding(horizontal = if (isTablet) 24.dp else 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier.fillMaxWidth().padding(
+                    start = if (isTablet) 16.dp else 8.dp,
+                    end = if (isTablet) 24.dp else 16.dp,
+                    top = if (isTablet) 8.dp else 4.dp
+                ),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                RoundedIconButton(
-                    icon = "←", onClick = onBackClick
-                )
+                // Forgiving outer hit-target for toddlers who miss the button center
+                Box(
+                    modifier = Modifier.size(touchZoneSize).clearAndSetSemantics {
+                        contentDescription = "Go Back"
+                        role = Role.Button
+                    }.clickable(
+                        interactionSource = backInteractionSource,
+                        indication = null,
+                        onClick = onBackClick
+                    ), contentAlignment = Alignment.Center
+                ) {
+                    RoundedIconButton(
+                        onClick = onBackClick,
+                        buttonSize = visualButtonSize,
+                        interactionSource = backInteractionSource
+                    )
+                }
             }
 
             // Responsive sky spacing above the cloud title banner
-            Spacer(modifier = Modifier.height(if (isTablet) 24.dp else 36.dp))
+            Spacer(modifier = Modifier.height(if (isTablet) 4.dp else 6.dp))
 
             Column(
                 modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = contentPadding)
             ) {
                 // Playful White Cloud Banner matching Creative Studio reference
+                val cloudShape = remember {
+                    SemiCircleCloudShape(
+                        archHeightRatio = 0.28f, bottomArchRatio = 0.16f
+                    )
+                }
+
+// Gentle floating idle animation
+                val infiniteTransition = rememberInfiniteTransition(label = "CloudBannerFloatLoop")
+                val cloudFloatY by infiniteTransition.animateFloat(
+                    initialValue = -3.5f, targetValue = 3.5f, animationSpec = infiniteRepeatable(
+                        animation = tween(durationMillis = 2200, easing = FastOutSlowInEasing),
+                        repeatMode = RepeatMode.Reverse
+                    ), label = "CloudFloatY"
+                )
+                val cloudBreathScale by infiniteTransition.animateFloat(
+                    initialValue = 0.992f, targetValue = 1.008f, animationSpec = infiniteRepeatable(
+                        animation = tween(durationMillis = 2600, easing = FastOutSlowInEasing),
+                        repeatMode = RepeatMode.Reverse
+                    ), label = "CloudBreathScale"
+                )
+
                 Box(
                     modifier = Modifier.fillMaxWidth()
-                        .padding(bottom = if (isTablet) 24.dp else 18.dp),
-                    contentAlignment = Alignment.Center
+                        .padding(bottom = if (isTablet) 24.dp else 18.dp).graphicsLayer {
+                            translationY = cloudFloatY
+                            scaleX = cloudBreathScale
+                            scaleY = cloudBreathScale
+                        }, contentAlignment = Alignment.Center
                 ) {
-                    Surface(
-                        shape = RoundedCornerShape(36.dp),
-                        color = Color.White,
-                        border = BorderStroke(2.5.dp, Color(0xFFE1F5FE)),
-                        shadowElevation = 6.dp
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.padding(
-                                horizontal = if (isTablet) 36.dp else 28.dp,
-                                vertical = if (isTablet) 14.dp else 10.dp
+                    Box(contentAlignment = Alignment.Center) {
+                        // Soft 3D bottom rim shadow matching the curved arch
+                        Box(
+                            modifier = Modifier.matchParentSize().offset(y = 5.dp).background(
+                                Color(0xFFB3E5FC).copy(alpha = 0.75f), shape = cloudShape
                             )
-                        ) {
-                            Text(
-                                text = explorerTitle,
-                                style = (if (isTablet) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.headlineMedium).copy(
-                                    fontSize = if (isTablet) 30.sp else 24.sp
-                                ),
-                                color = Color(0xFF1B365D),
-                                fontWeight = FontWeight.Black,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                        )
 
-                            if (!explorerSubtitle.isNullOrBlank()) {
-                                Spacer(modifier = Modifier.height(2.dp))
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(if (isTablet) 0.72f else 0.92f)
+                                .defaultMinSize(minHeight = if (isTablet) 104.dp else 84.dp),
+                            shape = cloudShape,
+                            color = Color.White,
+                            border = BorderStroke(3.dp, Color(0xFFE1F5FE)),
+                            shadowElevation = 6.dp
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center,
+                                modifier = Modifier.padding(
+                                    start = if (isTablet) 52.dp else 36.dp,
+                                    end = if (isTablet) 52.dp else 36.dp,
+                                    top = if (isTablet) 30.dp else 24.dp,
+                                    bottom = if (isTablet) 24.dp else 18.dp
+                                )
+                            ) {
                                 Text(
-                                    text = explorerSubtitle,
-                                    style = MaterialTheme.typography.bodyMedium.copy(
-                                        fontSize = if (isTablet) 15.sp else 12.sp
+                                    text = explorerTitle,
+                                    style = (if (isTablet) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.headlineMedium).copy(
+                                        fontSize = if (isTablet) 36.sp else 28.sp,
+                                        lineHeight = if (isTablet) 40.sp else 32.sp
                                     ),
-                                    color = Color(0xFF546E7A),
-                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF1B365D),
+                                    fontWeight = FontWeight.Black,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
+
+                                if (!explorerSubtitle.isNullOrBlank()) {
+                                    Spacer(modifier = Modifier.height(if (isTablet) 6.dp else 4.dp))
+                                    Text(
+                                        text = explorerSubtitle,
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontSize = if (isTablet) 17.sp else 14.sp
+                                        ),
+                                        color = Color(0xFF546E7A),
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
                             }
                         }
                     }
@@ -366,17 +458,34 @@ private fun GameListRowCard(
                     Box(contentAlignment = Alignment.Center) {
                         val iconUrl = game.thumbnailUrl
                         var imageLoadFailed by remember(iconUrl) { mutableStateOf(false) }
-                        if (!iconUrl.isNullOrBlank() && !imageLoadFailed) {
-                            AsyncImage(
-                                model = iconUrl,
-                                contentDescription = game.name,
-                                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)),
-                                contentScale = ContentScale.Crop,
-                                onError = { imageLoadFailed = true })
-                        } else {
-                            Text(
-                                text = badgeEmoji, fontSize = if (isTablet) 32.sp else 28.sp
-                            )
+                        val localDrawable = remember(game.name, game.gameId) {
+                            getGameLocalDrawable(game.name, game.gameId)
+                        }
+
+                        when {
+                            localDrawable != null -> {
+                                Image(
+                                    painter = painterResource(localDrawable),
+                                    contentDescription = game.name,
+                                    modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)),
+                                    contentScale = ContentScale.Fit
+                                )
+                            }
+                            !iconUrl.isNullOrBlank() && !imageLoadFailed -> {
+                                AsyncImage(
+                                    model = iconUrl,
+                                    contentDescription = game.name,
+                                    modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)),
+                                    contentScale = ContentScale.Fit,
+                                    onError = { imageLoadFailed = true }
+                                )
+                            }
+                            else -> {
+                                Text(
+                                    text = badgeEmoji,
+                                    fontSize = if (isTablet) 32.sp else 28.sp
+                                )
+                            }
                         }
                     }
                 }
@@ -455,6 +564,19 @@ private fun GamesEmptyState(onRefresh: () -> Unit) {
         actionLabel = "Refresh",
         onActionClick = onRefresh
     )
+}
+
+private fun getGameLocalDrawable(gameName: String, gameId: String): org.jetbrains.compose.resources.DrawableResource? {
+    val key = "${gameName}_${gameId}".lowercase()
+    return when {
+        key.contains("addition") || key.contains("math") -> Res.drawable.ic_game_addition_adventure
+        key.contains("picture_quest") || key.contains("picture quest") -> Res.drawable.ic_game_picture_quest
+        key.contains("number") || key.contains("count") -> Res.drawable.ic_game_number_quest
+        key.contains("match") || key.contains("discover") -> Res.drawable.ic_game_match_discover
+        key.contains("word") || key.contains("spell") || key.contains("builder") -> Res.drawable.ic_game_word_builder
+        key.contains("finder") || key.contains("find") || key.contains("animal") -> Res.drawable.ic_game_picture_finder
+        else -> null
+    }
 }
 
 // ==========================================
