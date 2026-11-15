@@ -17,5 +17,6 @@ data class GameItem(
     val minAge: Int? = null,
     val maxAge: Int? = null,
     val difficulty: String? = null,
-    val questionCount: Int? = null
+    val questionCount: Int? = null,
+    val thumbnailUrl: String? = null
 )

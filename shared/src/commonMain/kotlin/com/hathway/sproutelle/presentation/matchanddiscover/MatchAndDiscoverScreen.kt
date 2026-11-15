@@ -26,9 +26,9 @@ import com.hathway.sproutelle.presentation.matchanddiscover.components.MatchFeed
 import com.hathway.sproutelle.presentation.matchanddiscover.components.MatchPromptCard
 import com.hathway.sproutelle.presentation.matchanddiscover.components.MatchingBoard
 import org.jetbrains.compose.resources.painterResource
-import sproutelle.shared.generated.resources.Picture_Quest_bg_tablet
 import sproutelle.shared.generated.resources.Res
 import sproutelle.shared.generated.resources.match_and_discover_bg_mobile
+import sproutelle.shared.generated.resources.match_and_discover_bg_tablet
 import theme.SproutelleDimens
 
 @Composable
@@ -139,7 +139,7 @@ private fun MatchAndDiscoverAdaptiveLayout(
     onNextQuestion: () -> Unit
 ) {
     val backgroundImage =
-        if (isTablet) Res.drawable.Picture_Quest_bg_tablet else Res.drawable.match_and_discover_bg_mobile
+        if (isTablet) Res.drawable.match_and_discover_bg_tablet else Res.drawable.match_and_discover_bg_mobile
 
     Box(modifier = Modifier.fillMaxSize()) {
         Image(

@@ -40,4 +40,12 @@ sealed class Screen(val route: String) {
         val gameName: String,
         val subcategoryName: String
     ) : Screen("match_and_discover/$explorerId/$subcategoryId/$gameId")
+    data class NumberQuest(
+        val explorerId: String,
+        val explorerTitle: String,
+        val subcategoryId: String,
+        val gameId: String,
+        val gameName: String,
+        val subcategoryName: String
+    ) : Screen("number_quest/$explorerId/$subcategoryId/$gameId")
 }

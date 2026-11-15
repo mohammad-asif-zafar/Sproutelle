@@ -109,6 +109,7 @@ fun App() {
                         learningRepository.preloadQuestions(subcategoryId, gameId)
                         val isWordGame = gameId.contains("word", ignoreCase = true) || gameName.contains("word", ignoreCase = true)
                         val isMatchGame = gameId.contains("match", ignoreCase = true) || gameName.contains("match", ignoreCase = true)
+                        val isNumberGame = gameId.contains("number", ignoreCase = true) || gameName.contains("number", ignoreCase = true)
                         currentScreen = when {
                             isWordGame -> Screen.WordBuilder(
                                 explorerId = screen.explorerId,
@@ -119,6 +120,14 @@ fun App() {
                                 subcategoryName = subcategoryName
                             )
                             isMatchGame -> Screen.MatchAndDiscover(
+                                explorerId = screen.explorerId,
+                                explorerTitle = screen.explorerTitle,
+                                subcategoryId = subcategoryId,
+                                gameId = gameId,
+                                gameName = gameName,
+                                subcategoryName = subcategoryName
+                            )
+                            isNumberGame -> Screen.NumberQuest(
                                 explorerId = screen.explorerId,
                                 explorerTitle = screen.explorerTitle,
                                 subcategoryId = subcategoryId,
@@ -211,6 +220,35 @@ fun App() {
                 }
                 com.hathway.sproutelle.presentation.matchanddiscover.MatchAndDiscoverScreen(
                     viewModel = matchViewModel,
+                    onBackClick = {
+                        currentScreen = Screen.Games(
+                            explorerId = screen.explorerId,
+                            explorerTitle = screen.explorerTitle
+                        )
+                    },
+                    onHomeClick = {
+                        currentScreen = Screen.Home
+                    }
+                )
+            }
+            is Screen.NumberQuest -> {
+                SystemBackHandler {
+                    currentScreen = Screen.Games(
+                        explorerId = screen.explorerId,
+                        explorerTitle = screen.explorerTitle
+                    )
+                }
+                val numberViewModel = remember(screen.subcategoryId, screen.gameId) {
+                    com.hathway.sproutelle.presentation.numberquest.NumberQuestViewModel(
+                        explorerId = screen.explorerId,
+                        subcategoryId = screen.subcategoryId,
+                        gameId = screen.gameId,
+                        gameName = screen.gameName.ifBlank { "Number Quest" },
+                        learningRepository = learningRepository
+                    )
+                }
+                com.hathway.sproutelle.presentation.numberquest.NumberQuestScreen(
+                    viewModel = numberViewModel,
                     onBackClick = {
                         currentScreen = Screen.Games(
                             explorerId = screen.explorerId,
