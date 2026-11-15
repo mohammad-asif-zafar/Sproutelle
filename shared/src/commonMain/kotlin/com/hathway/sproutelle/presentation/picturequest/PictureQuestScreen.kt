@@ -166,17 +166,16 @@ private fun MobilePictureQuestContent(
     onNextQuestion: () -> Unit
 ) {
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val topTitleSpace = maxHeight * 0.16f
+        val topTitleSpace = maxHeight * 0.10f
         val optionsCount = currentQuestion.options.size
 
-        // Single Master Scrolling Layout completely eliminates items getting cut off or hidden behind overlays
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = SproutelleDimens.MobileContentPadding),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Spacer(modifier = Modifier.height(topTitleSpace))
 
@@ -193,17 +192,17 @@ private fun MobilePictureQuestContent(
                 isTablet = false
             )
 
-            // Dynamic Adaptive Row Slicing: Prevents layout flaws across irregular dataset lengths
+            // Dynamic Adaptive Row Slicing
             val chunkedOptions = currentQuestion.options.chunked(if (optionsCount == 3) 1 else 2)
 
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 chunkedOptions.forEach { rowItems ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
                         rowItems.forEach { option ->
                             val isSelected = state.selectedOptionId == option.id
@@ -213,10 +212,9 @@ private fun MobilePictureQuestContent(
                                 isCorrect = state.isCorrect,
                                 isTablet = false,
                                 onClick = { onOptionSelect(option.id) },
-                                modifier = Modifier.weight(1f) // Evenly spans columns perfectly
+                                modifier = Modifier.weight(1f)
                             )
                         }
-                        // Invisible filler balancing odd counts tails
                         if (rowItems.size < (if (optionsCount == 3) 1 else 2)) {
                             Spacer(modifier = Modifier.weight(1f))
                         }
@@ -231,18 +229,31 @@ private fun MobilePictureQuestContent(
                 )
             }
 
-            // Interactive Button embedded at the end of the scroll chain guarantees absolute safety visibility
             if (state.isCorrect == true) {
-                val isLastQuestion = state.currentQuestionIndex == state.questions.lastIndex
+                Spacer(modifier = Modifier.height(72.dp))
+            } else {
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+        }
+
+        // Pinned Bottom Action Button Area - Always 100% Floating & Visible above Navigation Bar
+        if (state.isCorrect == true) {
+            val isLastQuestion = state.currentQuestionIndex == state.questions.lastIndex
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+                color = Color.Transparent
+            ) {
                 Button(
                     onClick = onNextQuestion,
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
                     shape = RoundedCornerShape(24.dp),
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .navigationBarsPadding()
-                        .padding(vertical = 12.dp)
                         .height(54.dp)
                 ) {
                     Text(
@@ -253,10 +264,9 @@ private fun MobilePictureQuestContent(
                         fontSize = 18.sp
                     )
                 }
-            } else {
-                Spacer(modifier = Modifier.height(32.dp))
             }
         }
+
         QuestHeader(
             difficulty = state.difficulty,
             onBackClick = onBackClick,
@@ -264,7 +274,7 @@ private fun MobilePictureQuestContent(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .statusBarsPadding()
-                .padding(horizontal = 12.dp, vertical = 4.dp)
+                .padding(horizontal = 8.dp, vertical = 2.dp)
         )
     }
 }

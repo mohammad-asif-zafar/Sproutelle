@@ -49,7 +49,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.hathway.sproutelle.domain.model.Question
 import com.hathway.sproutelle.presentation.picturequest.components.QuestionImageIllustration
-
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 /**
  * A highly interactive, comic-styled Question Panel layout optimized for toddlers (Ages 3+).
  * Positions the Audio Control Button below the main text to maximize horizontal layout budget
@@ -85,13 +90,13 @@ object PictureQuestQuestionCard {
 
         // Kid-centric dynamic spacing metrics - shifts heights slightly depending on image presence
         val cardHeight =
-            if (isTablet) (if (hasNoImage) 155.dp else 210.dp) else (if (hasNoImage) 120.dp else 165.dp)
+            if (isTablet) (if (hasNoImage) 155.dp else 200.dp) else (if (hasNoImage) 110.dp else 125.dp)
         val strokeWidth = if (isTablet) 4.dp else 3.dp
         val outerCornerRadius = if (isTablet) 32.dp else 24.dp
 
-        val illustrationContainerSize = if (isTablet) 96.dp else 64.dp
-        val illustrationSize = if (isTablet) 72.dp else 48.dp
-        val illustrationFontSize = if (isTablet) 48.sp else 32.sp
+        val illustrationContainerSize = if (isTablet) 90.dp else 54.dp
+        val illustrationSize = if (isTablet) 68.dp else 40.dp
+        val illustrationFontSize = if (isTablet) 48.sp else 28.sp
 
         val audioDiscSize = if (isTablet) 52.dp else 42.dp
         val bubbleHorizontalPadding = if (isTablet) 16.dp else 12.dp
@@ -110,30 +115,32 @@ object PictureQuestQuestionCard {
             else -> 22.sp
         }
 
-        Box(
-            modifier = modifier.fillMaxWidth().height(cardHeight + (if (isTablet) 6.dp else 4.dp))
-                .graphicsLayer {
-                    rotationZ = continuousRotation
-                    translationY = continuousTranslationY
-                }) {
-            // Background toy-sticker solid offset drop shadow block
-            Box(
-                modifier = Modifier.matchParentSize().padding(
-                    top = if (isTablet) 6.dp else 4.dp, start = if (isTablet) 4.dp else 3.dp
-                ).background(Color(0xFFB0BEC5), shape = RoundedCornerShape(outerCornerRadius))
-            )
+        // Inside PictureQuestQuestionCard:
+        val bannerShape = remember { CurvedBannerShape(cornerRadiusRatio = 0.35f, topArchFactor = 0.08f, bottomArchFactor = 0.03f) }
 
+
+        Box(
+            modifier = Modifier.graphicsLayer {
+                rotationZ = continuousRotation
+                translationY = continuousTranslationY
+            }
+                .padding(
+                    top = if (isTablet) 6.dp else 4.dp,
+                    start = if (isTablet) 2.dp else 1.dp,
+                    end = if (isTablet) 2.dp else 1.dp
+                )
+                .background(Color(0xFFB0BEC5).copy(alpha = 0.6f), shape = bannerShape)
+        )
             // Primary Foreground Interactive Card Sheet
             Card(
-                modifier = Modifier.fillMaxWidth().height(cardHeight).border(
-                    width = strokeWidth,
-                    color = Color(0xFF1B365D),
-                    shape = RoundedCornerShape(outerCornerRadius)
-                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(cardHeight),
                 colors = CardDefaults.cardColors(containerColor = Color.White),
-                shape = RoundedCornerShape(outerCornerRadius),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                shape = bannerShape,
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
+
                 Row(
                     modifier = Modifier.fillMaxSize()
                         .padding(horizontal = if (isTablet) 18.dp else 14.dp, vertical = 12.dp),
@@ -220,11 +227,84 @@ object PictureQuestQuestionCard {
             }
         }
     }
-}
+
 
 private val SineGradientEaser = Easing { fraction ->
     androidx.compose.ui.util.lerp(0f, 1f, kotlin.math.sin(fraction * kotlin.math.PI.toFloat()))
 }
+
+
+
+class CurvedBannerShape(
+    private val cornerRadiusRatio: Float = 0.25f, // Controls how rounded the left/right ends are
+    private val topArchFactor: Float = 0.08f,     // Controls the upward curve of the top edge
+    private val bottomArchFactor: Float = 0.04f   // Controls the downward curve of the bottom edge
+) : Shape {
+    override fun createOutline(
+        size: Size,
+        layoutDirection: LayoutDirection,
+        density: Density
+    ): Outline {
+        val width = size.width
+        val height = size.height
+
+        val r = (minOf(width, height) * cornerRadiusRatio).coerceAtMost(height / 2f)
+        val topDip = height * topArchFactor
+        val bottomDip = height * bottomArchFactor
+
+        val path = Path().apply {
+            // Start at top-left after corner curve
+            moveTo(r, topDip)
+
+            // Top gently arching edge
+            quadraticBezierTo(
+                x1 = width / 2f, y1 = -topDip,
+                x2 = width - r, y2 = topDip
+            )
+
+            // Top-right corner
+            quadraticBezierTo(
+                x1 = width, y1 = topDip,
+                x2 = width, y2 = topDip + r
+            )
+
+            // Right side down to bottom-right corner
+            lineTo(width, height - bottomDip - r)
+
+            // Bottom-right corner
+            quadraticBezierTo(
+                x1 = width, y1 = height - bottomDip,
+                x2 = width - r, y2 = height - bottomDip
+            )
+
+            // Bottom gently arching edge
+            quadraticBezierTo(
+                x1 = width / 2f, y1 = height + bottomDip,
+                x2 = r, y2 = height - bottomDip
+            )
+
+            // Bottom-left corner
+            quadraticBezierTo(
+                x1 = 0f, y1 = height - bottomDip,
+                x2 = 0f, y2 = height - bottomDip - r
+            )
+
+            // Left side up to top-left corner
+            lineTo(0f, topDip + r)
+
+            // Top-left corner
+            quadraticBezierTo(
+                x1 = 0f, y1 = topDip,
+                x2 = r, y2 = topDip
+            )
+
+            close()
+        }
+
+        return Outline.Generic(path)
+    }
+}
+
 
 // ============================================================================
 // 📱 MOBILE STATE PREVIEWS (IMAGE PRESENT VS MISSING)

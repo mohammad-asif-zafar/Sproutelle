@@ -47,7 +47,7 @@ object QuestHeader {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Top
             ) {
                 // Left Navigation Actions Cluster
                 Row(
@@ -55,19 +55,10 @@ object QuestHeader {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Tactile 3D Comic Back Arrow Disc Button
-                    Box(modifier = Modifier.size(44.dp)) {
-                        // Layer 1.1: Solid drop shadow bottom rim
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .align(Alignment.BottomCenter)
-                                .background(Color(0xFFB2EBF2), shape = CircleShape)
-                        )
-                        // Layer 1.2: Core clickable button plate foreground
+                    Box(modifier = Modifier.size(40.dp)) {
                         Surface(
                             modifier = Modifier
                                 .size(40.dp)
-                                .align(Alignment.TopCenter)
                                 .border(2.dp, Color.White, CircleShape)
                                 .clickable { onBackClick() },
                             shape = CircleShape,
