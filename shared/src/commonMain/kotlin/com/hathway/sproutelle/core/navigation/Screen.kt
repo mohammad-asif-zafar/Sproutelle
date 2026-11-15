@@ -24,4 +24,20 @@ sealed class Screen(val route: String) {
         val gameName: String,
         val subcategoryName: String
     ) : Screen("question/$explorerId/$subcategoryId/$gameId")
+    data class WordBuilder(
+        val explorerId: String,
+        val explorerTitle: String,
+        val subcategoryId: String,
+        val gameId: String,
+        val gameName: String,
+        val subcategoryName: String
+    ) : Screen("word_builder/$explorerId/$subcategoryId/$gameId")
+    data class MatchAndDiscover(
+        val explorerId: String,
+        val explorerTitle: String,
+        val subcategoryId: String,
+        val gameId: String,
+        val gameName: String,
+        val subcategoryName: String
+    ) : Screen("match_and_discover/$explorerId/$subcategoryId/$gameId")
 }

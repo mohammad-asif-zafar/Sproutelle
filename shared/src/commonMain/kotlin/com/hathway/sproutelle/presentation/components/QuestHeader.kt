@@ -1,6 +1,5 @@
 package com.hathway.sproutelle.presentation.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -51,14 +50,14 @@ object QuestHeader {
             ) {
                 // Left Navigation Actions Cluster
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Tactile 3D Comic Back Arrow Disc Button
-                    Box(modifier = Modifier.size(40.dp)) {
+                    Box(modifier = Modifier.size(30.dp)) {
                         Surface(
                             modifier = Modifier
-                                .size(40.dp)
+                                .size(36.dp)
                                 .border(2.dp, Color.White, CircleShape)
                                 .clickable { onBackClick() },
                             shape = CircleShape,
@@ -69,7 +68,7 @@ object QuestHeader {
                                     imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                                     contentDescription = "Go Back",
                                     tint = Color(0xFF007AFF),
-                                    modifier = Modifier.size(22.dp)
+                                    modifier = Modifier.size(20.dp)
                                 )
                             }
                         }
@@ -79,12 +78,12 @@ object QuestHeader {
                     SproutelleHomeButton(
                         onClick = onHomeClick,
                         contentPadding = PaddingValues(0.dp),
-                        buttonSize = 40.dp
+                        buttonSize = 30.dp
                     )
                 }
 
                 // Right Difficulty Level Badge Layer
-                val badgeModifier = Modifier.padding(top = 2.dp)
+                val badgeModifier = Modifier.padding(top = 0.dp)
                 when (difficulty.trim().lowercase()) {
                     "easy" -> GameLevelBadge(
                         levelText = "Easy",

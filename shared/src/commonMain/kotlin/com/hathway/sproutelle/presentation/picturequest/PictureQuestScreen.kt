@@ -166,7 +166,7 @@ private fun MobilePictureQuestContent(
     onNextQuestion: () -> Unit
 ) {
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val topTitleSpace = maxHeight * 0.10f
+        val topTitleSpace = maxHeight * 0.14f
         val optionsCount = currentQuestion.options.size
 
         Column(
@@ -274,7 +274,7 @@ private fun MobilePictureQuestContent(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .statusBarsPadding()
-                .padding(horizontal = 8.dp, vertical = 2.dp)
+                .padding(horizontal = 8.dp, vertical = 0.dp)
         )
     }
 }

@@ -73,19 +73,34 @@ object PictureQuestQuestionCard {
         // Validation check flag: Determines if the data payload lacks image assets completely
         val hasNoImage = question.imageUrl.isNullOrBlank() && question.imageAssetId.isNullOrBlank()
 
-        // Continuous Kid-Friendly Idle Floating Wobble Loop Animation
-        val infiniteTransition = rememberInfiniteTransition(label = "CardWobbleLoop")
-        val continuousRotation by infiniteTransition.animateFloat(
-            initialValue = -1.5f, targetValue = 1.5f, animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 1800, easing = LinearEasing),
+        // Kid-Friendly Interactive "Little Shake" Animation Loop
+        val infiniteTransition = rememberInfiniteTransition(label = "CardShakeLoop")
+        val shakeRotation by infiniteTransition.animateFloat(
+            initialValue = -2.2f,
+            targetValue = 2.2f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 650, easing = LinearEasing),
                 repeatMode = RepeatMode.Reverse
-            ), label = "WobbleRotation"
+            ),
+            label = "ShakeRotation"
         )
-        val continuousTranslationY by infiniteTransition.animateFloat(
-            initialValue = -3f, targetValue = 3f, animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 2200, easing = SineGradientEaser),
+        val shakeTranslationX by infiniteTransition.animateFloat(
+            initialValue = -2.5f,
+            targetValue = 2.5f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 450, easing = LinearEasing),
                 repeatMode = RepeatMode.Reverse
-            ), label = "FloatingTranslation"
+            ),
+            label = "ShakeTranslationX"
+        )
+        val shakeTranslationY by infiniteTransition.animateFloat(
+            initialValue = -2.0f,
+            targetValue = 2.0f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 850, easing = SineGradientEaser),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "ShakeTranslationY"
         )
 
         // Kid-centric dynamic spacing metrics - shifts heights slightly depending on image presence
@@ -120,10 +135,12 @@ object PictureQuestQuestionCard {
 
 
         Box(
-            modifier = Modifier.graphicsLayer {
-                rotationZ = continuousRotation
-                translationY = continuousTranslationY
-            }
+            modifier = modifier
+                .graphicsLayer {
+                    rotationZ = shakeRotation
+                    translationX = shakeTranslationX
+                    translationY = shakeTranslationY
+                }
                 .padding(
                     top = if (isTablet) 6.dp else 4.dp,
                     start = if (isTablet) 2.dp else 1.dp,

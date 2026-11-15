@@ -107,14 +107,34 @@ fun App() {
                     },
                     onGameClick = { gameId, subcategoryId, gameName, subcategoryName ->
                         learningRepository.preloadQuestions(subcategoryId, gameId)
-                        currentScreen = Screen.Question(
-                            explorerId = screen.explorerId,
-                            explorerTitle = screen.explorerTitle,
-                            subcategoryId = subcategoryId,
-                            gameId = gameId,
-                            gameName = gameName,
-                            subcategoryName = subcategoryName
-                        )
+                        val isWordGame = gameId.contains("word", ignoreCase = true) || gameName.contains("word", ignoreCase = true)
+                        val isMatchGame = gameId.contains("match", ignoreCase = true) || gameName.contains("match", ignoreCase = true)
+                        currentScreen = when {
+                            isWordGame -> Screen.WordBuilder(
+                                explorerId = screen.explorerId,
+                                explorerTitle = screen.explorerTitle,
+                                subcategoryId = subcategoryId,
+                                gameId = gameId,
+                                gameName = gameName,
+                                subcategoryName = subcategoryName
+                            )
+                            isMatchGame -> Screen.MatchAndDiscover(
+                                explorerId = screen.explorerId,
+                                explorerTitle = screen.explorerTitle,
+                                subcategoryId = subcategoryId,
+                                gameId = gameId,
+                                gameName = gameName,
+                                subcategoryName = subcategoryName
+                            )
+                            else -> Screen.Question(
+                                explorerId = screen.explorerId,
+                                explorerTitle = screen.explorerTitle,
+                                subcategoryId = subcategoryId,
+                                gameId = gameId,
+                                gameName = gameName,
+                                subcategoryName = subcategoryName
+                            )
+                        }
                     }
                 )
             }
@@ -141,6 +161,64 @@ fun App() {
                             explorerId = screen.explorerId,
                             explorerTitle = screen.explorerTitle
                         )
+                    }
+                )
+            }
+            is Screen.WordBuilder -> {
+                SystemBackHandler {
+                    currentScreen = Screen.Games(
+                        explorerId = screen.explorerId,
+                        explorerTitle = screen.explorerTitle
+                    )
+                }
+                val wordBuilderViewModel = remember(screen.subcategoryId, screen.gameId) {
+                    com.hathway.sproutelle.presentation.wordbuilder.WordBuilderViewModel(
+                        explorerId = screen.explorerId,
+                        subcategoryId = screen.subcategoryId,
+                        gameId = screen.gameId,
+                        gameName = screen.gameName.ifBlank { "Word Builder" },
+                        learningRepository = learningRepository
+                    )
+                }
+                com.hathway.sproutelle.presentation.wordbuilder.WordBuilderScreen(
+                    viewModel = wordBuilderViewModel,
+                    onBackClick = {
+                        currentScreen = Screen.Games(
+                            explorerId = screen.explorerId,
+                            explorerTitle = screen.explorerTitle
+                        )
+                    },
+                    onHomeClick = {
+                        currentScreen = Screen.Home
+                    }
+                )
+            }
+            is Screen.MatchAndDiscover -> {
+                SystemBackHandler {
+                    currentScreen = Screen.Games(
+                        explorerId = screen.explorerId,
+                        explorerTitle = screen.explorerTitle
+                    )
+                }
+                val matchViewModel = remember(screen.subcategoryId, screen.gameId) {
+                    com.hathway.sproutelle.presentation.matchanddiscover.MatchAndDiscoverViewModel(
+                        explorerId = screen.explorerId,
+                        subcategoryId = screen.subcategoryId,
+                        gameId = screen.gameId,
+                        gameName = screen.gameName.ifBlank { "Match & Discover" },
+                        learningRepository = learningRepository
+                    )
+                }
+                com.hathway.sproutelle.presentation.matchanddiscover.MatchAndDiscoverScreen(
+                    viewModel = matchViewModel,
+                    onBackClick = {
+                        currentScreen = Screen.Games(
+                            explorerId = screen.explorerId,
+                            explorerTitle = screen.explorerTitle
+                        )
+                    },
+                    onHomeClick = {
+                        currentScreen = Screen.Home
                     }
                 )
             }
