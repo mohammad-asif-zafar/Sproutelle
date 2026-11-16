@@ -6,7 +6,6 @@ import com.hathway.sproutelle.domain.model.GameConfig
 import com.hathway.sproutelle.domain.model.GameLevel
 import com.hathway.sproutelle.domain.model.GameProgress
 import com.hathway.sproutelle.domain.model.Question
-import com.hathway.sproutelle.domain.model.QuestionOption
 import com.hathway.sproutelle.domain.repository.LearningRepository
 import com.hathway.sproutelle.domain.repository.LearningState
 import kotlinx.coroutines.CancellationException
@@ -53,6 +52,7 @@ class PictureQuestViewModel(
 
     private var currentGameConfig: GameConfig? = null
     private var currentGameLevels: List<GameLevel> = emptyList()
+    private var allRawQuestions: List<Question> = emptyList()
 
     init {
         loadGameData()
@@ -89,8 +89,10 @@ class PictureQuestViewModel(
                 learningRepository.getGameLevelsState(gameId).collect { state ->
                     if (state is LearningState.Fresh) {
                         currentGameLevels = state.data
+                        processLoadedQuestions(allRawQuestions, isOffline = (_uiState.value as? PictureQuestUiState.Success)?.isOffline ?: false)
                     } else if (state is LearningState.Cached) {
                         currentGameLevels = state.data
+                        processLoadedQuestions(allRawQuestions, isOffline = (_uiState.value as? PictureQuestUiState.Success)?.isOffline ?: false)
                     }
                 }
             }
@@ -123,26 +125,36 @@ class PictureQuestViewModel(
     }
 
     private fun processLoadedQuestions(rawQuestions: List<Question>, isOffline: Boolean) {
-        if (rawQuestions.isEmpty()) {
+        allRawQuestions = rawQuestions
+
+        // If there are no levels AND no raw questions, emit PictureQuestUiState.Empty
+        if (currentGameLevels.isEmpty() && rawQuestions.isEmpty()) {
             _uiState.value = PictureQuestUiState.Empty
             return
         }
 
         val config = currentGameConfig
-        var processedQuestions = rawQuestions
-
         val currentSuccess = _uiState.value as? PictureQuestUiState.Success
-        val currentLevel = currentGameLevels.getOrNull(currentSuccess?.currentLevelIndex ?: 0)
-        if (currentLevel != null && processedQuestions.any { it.levelId != null }) {
-            processedQuestions = processedQuestions.filter { it.levelId == currentLevel.id || it.levelId == null }
+        val selectedLevelIdx = currentSuccess?.currentLevelIndex ?: 0
+        val currentLevel = currentGameLevels.getOrNull(selectedLevelIdx)
+
+        // Strict level-based filtering:
+        // If the game has defined levels, filter strictly by currentLevel.id.
+        // Questions with level_id = null are NOT included in level-based games.
+        val levelFiltered = if (currentGameLevels.isNotEmpty() && currentLevel != null) {
+            rawQuestions.filter { it.levelId == currentLevel.id }
+        } else {
+            rawQuestions
         }
 
+        var processedQuestions = levelFiltered
+
         // Apply randomization if backend config requires it
-        if (config?.randomizeQuestionOrder == true) {
+        if (config?.randomizeQuestionOrder == true && processedQuestions.isNotEmpty()) {
             processedQuestions = processedQuestions.shuffled()
         }
 
-        if (config?.randomizeAnswerOrder == true) {
+        if (config?.randomizeAnswerOrder == true && processedQuestions.isNotEmpty()) {
             processedQuestions = processedQuestions.map { question ->
                 question.copy(options = question.options.shuffled())
             }
@@ -155,6 +167,7 @@ class PictureQuestViewModel(
                 questions = processedQuestions,
                 gameConfig = config ?: currentSuccess.gameConfig,
                 levels = currentGameLevels,
+                currentLevelIndex = selectedLevelIdx,
                 isOffline = isOffline,
                 difficulty = difficulty
             )
@@ -163,6 +176,7 @@ class PictureQuestViewModel(
                 questions = processedQuestions,
                 gameConfig = config,
                 levels = currentGameLevels,
+                currentLevelIndex = selectedLevelIdx,
                 isOffline = isOffline,
                 difficulty = difficulty
             )
@@ -220,10 +234,16 @@ class PictureQuestViewModel(
 
         // Kid-safe interaction auto-clear for incorrect choices
         if (!isCorrect) {
+            val submittedLevelIndex = current.currentLevelIndex
+            val submittedQuestionIndex = current.currentQuestionIndex
             viewModelScope.launch {
                 delay(2000)
                 val stateNow = _uiState.value as? PictureQuestUiState.Success
-                if (stateNow != null && stateNow.selectedOptionId == optionId && stateNow.isCorrect == false) {
+                if (stateNow != null &&
+                    stateNow.currentLevelIndex == submittedLevelIndex &&
+                    stateNow.currentQuestionIndex == submittedQuestionIndex &&
+                    stateNow.selectedOptionId == optionId &&
+                    stateNow.isCorrect == false) {
                     _uiState.value = stateNow.copy(
                         selectedOptionId = null,
                         isOptionSubmitted = false,
@@ -255,10 +275,22 @@ class PictureQuestViewModel(
         if (levelIndex !in current.levels.indices) return
         val targetLevel = current.levels[levelIndex]
 
-        val levelFiltered = current.questions.filter { it.levelId == targetLevel.id || it.levelId == null }
+        val levelFiltered = if (current.levels.isNotEmpty()) {
+            allRawQuestions.filter { it.levelId == targetLevel.id }
+        } else {
+            allRawQuestions
+        }
+
+        var processed = levelFiltered
+        if (current.gameConfig?.randomizeQuestionOrder == true && processed.isNotEmpty()) {
+            processed = processed.shuffled()
+        }
+        if (current.gameConfig?.randomizeAnswerOrder == true && processed.isNotEmpty()) {
+            processed = processed.map { q -> q.copy(options = q.options.shuffled()) }
+        }
 
         _uiState.value = current.copy(
-            questions = if (levelFiltered.isNotEmpty()) levelFiltered else current.questions,
+            questions = processed,
             currentLevelIndex = levelIndex,
             currentQuestionIndex = 0,
             selectedOptionId = null,

@@ -443,4 +443,86 @@ class LearningRepositoryTest {
         assertEquals(null, domainItem.difficulty)
         assertEquals(null, domainItem.questionCount)
     }
+
+    @Test
+    fun test15_TwoLevelsWithDifferentQuestions(): Unit = runBlocking {
+        val gameId = "game_levels_test"
+        val subId = "sub_1"
+        val level1 = GameLevel(id = "lvl_1", gameId = gameId, levelNumber = 1, name = "Level 1 Easy", description = "Desc 1", minScoreToUnlock = 80)
+        val level2 = GameLevel(id = "lvl_2", gameId = gameId, levelNumber = 2, name = "Level 2 Hard", description = "Desc 2", minScoreToUnlock = 80)
+
+        val q1 = Question(id = "q1", gameId = gameId, subcategoryId = subId, levelId = level1.id, text = "Level 1 Question?", type = "quiz", sortOrder = 1, isDraft = false)
+        val q2 = Question(id = "q2", gameId = gameId, subcategoryId = subId, levelId = level2.id, text = "Level 2 Question?", type = "quiz", sortOrder = 2, isDraft = false)
+
+        val remote = FakeLearningRemoteDataSource(
+            questionsToReturn = mapOf("${subId}_${gameId}" to Result.success(listOf(q1, q2))),
+            levelsToReturn = mapOf(gameId to Result.success(listOf(level1, level2)))
+        )
+        val cache = FakeLearningCacheStorage()
+        val repository = LearningRepositoryImpl(remote, cache)
+
+        val loadedLevels = repository.getGameLevelsState(gameId).first { it is LearningState.Fresh }
+        assertNotNull(loadedLevels)
+        val levels = (loadedLevels as LearningState.Fresh).data
+        assertEquals(2, levels.size)
+
+        val loadedQuestions = repository.getQuestions(subId, gameId).first { it.isNotEmpty() }
+        assertEquals(2, loadedQuestions.size)
+
+        val level1Questions = loadedQuestions.filter { it.levelId == level1.id }
+        val level2Questions = loadedQuestions.filter { it.levelId == level2.id }
+
+        assertEquals(1, level1Questions.size)
+        assertEquals("Level 1 Question?", level1Questions[0].text)
+        assertEquals(1, level2Questions.size)
+        assertEquals("Level 2 Question?", level2Questions[0].text)
+    }
+
+    @Test
+    fun test16_EmptyLevelHandling(): Unit = runBlocking {
+        val gameId = "game_empty_level"
+        val subId = "sub_1"
+        val level1 = GameLevel(id = "lvl_1", gameId = gameId, levelNumber = 1, name = "Level 1 Empty", description = "Desc 1", minScoreToUnlock = 80)
+
+        val remote = FakeLearningRemoteDataSource(
+            questionsToReturn = mapOf("${subId}_${gameId}" to Result.success(emptyList())),
+            levelsToReturn = mapOf(gameId to Result.success(listOf(level1)))
+        )
+        val cache = FakeLearningCacheStorage()
+        val repository = LearningRepositoryImpl(remote, cache)
+
+        val loadedQuestions = repository.getQuestions(subId, gameId).first()
+        assertEquals(0, loadedQuestions.size)
+    }
+
+    @Test
+    fun test17_GameProgressPersistenceWithLevelId(): Unit = runBlocking {
+        val childId = "child_test"
+        val gameId = "game_test"
+        val levelId = "lvl_1"
+
+        val progress = GameProgress(
+            childId = childId,
+            gameId = gameId,
+            levelId = levelId,
+            questionsAttempted = 5,
+            correctAnswers = 4,
+            incorrectAnswers = 1,
+            score = 40,
+            completionStatus = "completed",
+            bestScore = 40
+        )
+
+        val cache = FakeLearningCacheStorage()
+        val remote = FakeLearningRemoteDataSource()
+        val repository = LearningRepositoryImpl(remote, cache)
+
+        repository.saveGameProgress(progress)
+        val loaded = repository.getGameProgress(childId, gameId, levelId)
+
+        assertNotNull(loaded)
+        assertEquals(levelId, loaded.levelId)
+        assertEquals(40, loaded.score)
+        assertEquals("completed", loaded.completionStatus)
+    }
 }

@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -40,10 +39,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hathway.sproutelle.core.responsive.ProvideWindowSizeClass
+import com.hathway.sproutelle.domain.model.GameLevel
 import com.hathway.sproutelle.domain.model.Question
 import com.hathway.sproutelle.domain.model.QuestionOption
 import com.hathway.sproutelle.presentation.components.EmptyState
 import com.hathway.sproutelle.presentation.components.ErrorState
+import com.hathway.sproutelle.presentation.components.GameLevelBadge
 import com.hathway.sproutelle.presentation.components.LoadingState
 import com.hathway.sproutelle.presentation.components.PictureQuestQuestionCard
 import com.hathway.sproutelle.presentation.components.QuestFeedbackBannerImage
@@ -97,12 +98,21 @@ fun PictureQuestScreen(
                             onBackClick = onBackClick
                         )
                     } else if (currentQuestion == null) {
-                        EmptyState(
-                            message = "No questions available for Picture Quest yet",
-                            iconEmoji = "🖼️",
-                            actionLabel = "Refresh",
-                            onActionClick = viewModel::refresh
-                        )
+                        if (state.levels.isNotEmpty()) {
+                            PictureQuestLevelEmptyScreen(
+                                state = state,
+                                onLevelSelect = viewModel::selectLevel,
+                                onBackClick = onBackClick,
+                                onHomeClick = onHomeClick
+                            )
+                        } else {
+                            EmptyState(
+                                message = "No questions available for Picture Quest yet",
+                                iconEmoji = "🖼️",
+                                actionLabel = "Refresh",
+                                onActionClick = viewModel::refresh
+                            )
+                        }
                     } else {
                         PictureQuestAdaptiveLayout(
                             state = state,
@@ -112,6 +122,7 @@ fun PictureQuestScreen(
                             onHomeClick = onHomeClick,
                             onAudioToggle = viewModel::toggleAudioMute,
                             onHintToggle = viewModel::toggleHint,
+                            onLevelSelect = viewModel::selectLevel,
                             onOptionSelect = viewModel::selectOption,
                             onNextQuestion = viewModel::nextQuestion
                         )
@@ -131,6 +142,7 @@ private fun PictureQuestAdaptiveLayout(
     onHomeClick: () -> Unit,
     onAudioToggle: () -> Unit,
     onHintToggle: () -> Unit,
+    onLevelSelect: (Int) -> Unit,
     onOptionSelect: (String) -> Unit,
     onNextQuestion: () -> Unit
 ) {
@@ -153,6 +165,7 @@ private fun PictureQuestAdaptiveLayout(
                 onHomeClick = onHomeClick,
                 onAudioToggle = onAudioToggle,
                 onHintToggle = onHintToggle,
+                onLevelSelect = onLevelSelect,
                 onOptionSelect = onOptionSelect,
                 onNextQuestion = onNextQuestion
             )
@@ -164,6 +177,7 @@ private fun PictureQuestAdaptiveLayout(
                 onHomeClick = onHomeClick,
                 onAudioToggle = onAudioToggle,
                 onHintToggle = onHintToggle,
+                onLevelSelect = onLevelSelect,
                 onOptionSelect = onOptionSelect,
                 onNextQuestion = onNextQuestion
             )
@@ -179,6 +193,7 @@ private fun MobilePictureQuestContent(
     onHomeClick: () -> Unit,
     onAudioToggle: () -> Unit,
     onHintToggle: () -> Unit,
+    onLevelSelect: (Int) -> Unit,
     onOptionSelect: (String) -> Unit,
     onNextQuestion: () -> Unit
 ) {
@@ -195,6 +210,14 @@ private fun MobilePictureQuestContent(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Spacer(modifier = Modifier.height(topTitleSpace))
+
+            if (state.levels.size > 1) {
+                LevelSelectorBar(
+                    levels = state.levels,
+                    currentLevelIndex = state.currentLevelIndex,
+                    onLevelSelect = onLevelSelect
+                )
+            }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -348,6 +371,7 @@ private fun TabletPictureQuestContent(
     onHomeClick: () -> Unit,
     onAudioToggle: () -> Unit,
     onHintToggle: () -> Unit,
+    onLevelSelect: (Int) -> Unit,
     onOptionSelect: (String) -> Unit,
     onNextQuestion: () -> Unit
 ) {
@@ -362,6 +386,14 @@ private fun TabletPictureQuestContent(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Spacer(modifier = Modifier.height(topTitleSpace))
+
+            if (state.levels.size > 1) {
+                LevelSelectorBar(
+                    levels = state.levels,
+                    currentLevelIndex = state.currentLevelIndex,
+                    onLevelSelect = onLevelSelect
+                )
+            }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -517,6 +549,102 @@ private fun TabletPictureQuestContent(
 }
 
 @Composable
+fun LevelSelectorBar(
+    levels: List<GameLevel>,
+    currentLevelIndex: Int,
+    onLevelSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    if (levels.size <= 1) return
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        levels.forEachIndexed { idx, level ->
+            val isSelected = idx == currentLevelIndex
+            GameLevelBadge(
+                levelText = level.name.ifBlank { "Level ${level.levelNumber}" },
+                icon = if (isSelected) "⭐" else "🌱",
+                backgroundColor = if (isSelected) Color(0xFFFFE0B2) else Color(0xFFF5F5F5),
+                borderColor = if (isSelected) Color(0xFFFFB74D) else Color(0xFFE0E0E0),
+                textColor = if (isSelected) Color(0xFFE65100) else Color(0xFF616161),
+                onClick = { onLevelSelect(idx) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun PictureQuestLevelEmptyScreen(
+    state: PictureQuestUiState.Success,
+    onLevelSelect: (Int) -> Unit,
+    onBackClick: () -> Unit,
+    onHomeClick: () -> Unit = onBackClick
+) {
+    val currentLevel = state.levels.getOrNull(state.currentLevelIndex)
+    val levelName = currentLevel?.name?.ifBlank { "Level ${state.currentLevelIndex + 1}" } ?: "Level ${state.currentLevelIndex + 1}"
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Spacer(modifier = Modifier.height(60.dp))
+
+            LevelSelectorBar(
+                levels = state.levels,
+                currentLevelIndex = state.currentLevelIndex,
+                onLevelSelect = onLevelSelect
+            )
+
+            Card(
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = 24.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "🌱 $levelName is Empty 🌱",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = Color(0xFF0D47A1),
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = "No questions available for $levelName yet. Please select another level above!",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color(0xFF5D4037),
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+
+        QuestHeader(
+            difficulty = state.difficulty,
+            onBackClick = onBackClick,
+            onHomeClick = onHomeClick,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .statusBarsPadding()
+                .padding(horizontal = 8.dp)
+        )
+    }
+}
+
+@Composable
 private fun PictureQuestCompletionScreen(
     state: PictureQuestUiState.Success,
     onRestart: () -> Unit,
@@ -641,6 +769,7 @@ private fun MobilePictureQuestPreview() {
             onHomeClick = {},
             onAudioToggle = {},
             onHintToggle = {},
+            onLevelSelect = {},
             onOptionSelect = {},
             onNextQuestion = {})
     }
