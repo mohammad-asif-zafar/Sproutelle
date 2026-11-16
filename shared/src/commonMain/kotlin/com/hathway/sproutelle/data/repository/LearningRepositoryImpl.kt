@@ -4,7 +4,10 @@ import com.hathway.sproutelle.core.currentTimeMillis
 import com.hathway.sproutelle.data.datasource.LearningCache
 import com.hathway.sproutelle.data.datasource.LearningCacheStorage
 import com.hathway.sproutelle.data.datasource.LearningRemoteDataSource
+import com.hathway.sproutelle.domain.model.GameConfig
 import com.hathway.sproutelle.domain.model.GameItem
+import com.hathway.sproutelle.domain.model.GameLevel
+import com.hathway.sproutelle.domain.model.GameProgress
 import com.hathway.sproutelle.domain.model.Question
 import com.hathway.sproutelle.domain.model.Subcategory
 import com.hathway.sproutelle.domain.model.SubcategoryWithGames
@@ -55,28 +58,40 @@ class LearningRepositoryImpl(
     private val questionInFlight = mutableMapOf<String, Deferred<Result<Unit>>>()
     private val initializedQuestions = mutableSetOf<String>()
 
+    private val gameConfigStates = mutableMapOf<String, MutableStateFlow<LearningState<GameConfig>>>()
+    private val gameConfigInitMutex = Mutex()
+    private val gameConfigRefreshMutex = Mutex()
+    private val gameConfigInFlight = mutableMapOf<String, Deferred<Result<Unit>>>()
+    private val initializedGameConfigs = mutableSetOf<String>()
+
+    private val gameLevelStates = mutableMapOf<String, MutableStateFlow<LearningState<List<GameLevel>>>>()
+    private val gameLevelInitMutex = Mutex()
+    private val gameLevelRefreshMutex = Mutex()
+    private val gameLevelInFlight = mutableMapOf<String, Deferred<Result<Unit>>>()
+    private val initializedGameLevels = mutableSetOf<String>()
+
     private fun getOrCreateSubcategoryState(explorerId: String): MutableStateFlow<LearningState<List<Subcategory>>> {
-        return subcategoryStates.getOrPut(explorerId) {
-            MutableStateFlow(LearningState.Loading)
-        }
+        return subcategoryStates.getOrPut(explorerId) { MutableStateFlow(LearningState.Loading) }
     }
 
     private fun getOrCreateGameState(subcategoryId: String): MutableStateFlow<LearningState<List<GameItem>>> {
-        return gameStates.getOrPut(subcategoryId) {
-            MutableStateFlow(LearningState.Loading)
-        }
+        return gameStates.getOrPut(subcategoryId) { MutableStateFlow(LearningState.Loading) }
     }
 
     private fun getOrCreateExplorerGameState(explorerId: String): MutableStateFlow<LearningState<List<SubcategoryWithGames>>> {
-        return explorerGamesStates.getOrPut(explorerId) {
-            MutableStateFlow(LearningState.Loading)
-        }
+        return explorerGamesStates.getOrPut(explorerId) { MutableStateFlow(LearningState.Loading) }
     }
 
     private fun getOrCreateQuestionState(key: String): MutableStateFlow<LearningState<List<Question>>> {
-        return questionStates.getOrPut(key) {
-            MutableStateFlow(LearningState.Loading)
-        }
+        return questionStates.getOrPut(key) { MutableStateFlow(LearningState.Loading) }
+    }
+
+    private fun getOrCreateGameConfigState(gameId: String): MutableStateFlow<LearningState<GameConfig>> {
+        return gameConfigStates.getOrPut(gameId) { MutableStateFlow(LearningState.Loading) }
+    }
+
+    private fun getOrCreateGameLevelState(gameId: String): MutableStateFlow<LearningState<List<GameLevel>>> {
+        return gameLevelStates.getOrPut(gameId) { MutableStateFlow(LearningState.Loading) }
     }
 
     private suspend fun ensureSubcategoriesInitialized(explorerId: String) {
@@ -156,6 +171,44 @@ class LearningRepositoryImpl(
         }
     }
 
+    private suspend fun ensureGameConfigInitialized(gameId: String) {
+        if (initializedGameConfigs.contains(gameId)) return
+        gameConfigInitMutex.withLock {
+            if (!initializedGameConfigs.contains(gameId)) {
+                val flow = getOrCreateGameConfigState(gameId)
+                try {
+                    val cached = cacheStorage.loadGameConfig(gameId)
+                    if (cached != null) {
+                        flow.value = LearningState.Cached(cached)
+                    }
+                } catch (e: Exception) {
+                    println("LearningRepository: GameConfig cache load error: ${e.message}")
+                }
+                initializedGameConfigs.add(gameId)
+                refreshGameConfig(gameId)
+            }
+        }
+    }
+
+    private suspend fun ensureGameLevelsInitialized(gameId: String) {
+        if (initializedGameLevels.contains(gameId)) return
+        gameLevelInitMutex.withLock {
+            if (!initializedGameLevels.contains(gameId)) {
+                val flow = getOrCreateGameLevelState(gameId)
+                try {
+                    val cached = cacheStorage.loadGameLevels(gameId)
+                    if (cached.isNotEmpty()) {
+                        flow.value = LearningState.Cached(cached)
+                    }
+                } catch (e: Exception) {
+                    println("LearningRepository: GameLevels cache load error: ${e.message}")
+                }
+                initializedGameLevels.add(gameId)
+                refreshGameLevels(gameId)
+            }
+        }
+    }
+
     override fun getSubcategories(explorerId: String): Flow<List<Subcategory>> {
         return getSubcategoriesState(explorerId).map { state ->
             when (state) {
@@ -170,9 +223,7 @@ class LearningRepositoryImpl(
 
     override fun getSubcategoriesState(explorerId: String): Flow<LearningState<List<Subcategory>>> {
         val flow = getOrCreateSubcategoryState(explorerId)
-        repositoryScope.launch {
-            ensureSubcategoriesInitialized(explorerId)
-        }
+        repositoryScope.launch { ensureSubcategoriesInitialized(explorerId) }
         return flow.asStateFlow()
     }
 
@@ -236,9 +287,7 @@ class LearningRepositoryImpl(
                     }
                     result.map { }
                 } finally {
-                    subcategoryRefreshMutex.withLock {
-                        subcategoryInFlight.remove(explorerId)
-                    }
+                    subcategoryRefreshMutex.withLock { subcategoryInFlight.remove(explorerId) }
                 }
             }
             subcategoryInFlight[explorerId] = deferred
@@ -261,9 +310,7 @@ class LearningRepositoryImpl(
 
     override fun getGamesForSubcategoryState(subcategoryId: String): Flow<LearningState<List<GameItem>>> {
         val flow = getOrCreateGameState(subcategoryId)
-        repositoryScope.launch {
-            ensureGamesInitialized(subcategoryId)
-        }
+        repositoryScope.launch { ensureGamesInitialized(subcategoryId) }
         return flow.asStateFlow()
     }
 
@@ -301,9 +348,7 @@ class LearningRepositoryImpl(
                     }
                     result.map { }
                 } finally {
-                    gameRefreshMutex.withLock {
-                        gameInFlight.remove(subcategoryId)
-                    }
+                    gameRefreshMutex.withLock { gameInFlight.remove(subcategoryId) }
                 }
             }
             gameInFlight[subcategoryId] = deferred
@@ -326,9 +371,7 @@ class LearningRepositoryImpl(
 
     override fun getGamesForExplorerState(explorerId: String): Flow<LearningState<List<SubcategoryWithGames>>> {
         val flow = getOrCreateExplorerGameState(explorerId)
-        repositoryScope.launch {
-            ensureExplorerGamesInitialized(explorerId)
-        }
+        repositoryScope.launch { ensureExplorerGamesInitialized(explorerId) }
         return flow.asStateFlow()
     }
 
@@ -394,9 +437,7 @@ class LearningRepositoryImpl(
                     }
                     result.map { }
                 } finally {
-                    explorerGamesRefreshMutex.withLock {
-                        explorerGamesInFlight.remove(explorerId)
-                    }
+                    explorerGamesRefreshMutex.withLock { explorerGamesInFlight.remove(explorerId) }
                 }
             }
             explorerGamesInFlight[explorerId] = deferred
@@ -420,9 +461,7 @@ class LearningRepositoryImpl(
     override fun getQuestionsState(subcategoryId: String, gameId: String): Flow<LearningState<List<Question>>> {
         val key = "${subcategoryId}_${gameId}"
         val flow = getOrCreateQuestionState(key)
-        repositoryScope.launch {
-            ensureQuestionsInitialized(subcategoryId, gameId)
-        }
+        repositoryScope.launch { ensureQuestionsInitialized(subcategoryId, gameId) }
         return flow.asStateFlow()
     }
 
@@ -461,9 +500,7 @@ class LearningRepositoryImpl(
                     }
                     result.map { }
                 } finally {
-                    questionRefreshMutex.withLock {
-                        questionInFlight.remove(key)
-                    }
+                    questionRefreshMutex.withLock { questionInFlight.remove(key) }
                 }
             }
             questionInFlight[key] = deferred
@@ -472,27 +509,107 @@ class LearningRepositoryImpl(
         return jobToAwait.await()
     }
 
-    override fun preloadSubcategories(explorerId: String) {
-        repositoryScope.launch {
-            ensureSubcategoriesInitialized(explorerId)
+    override fun getGameConfigState(gameId: String): Flow<LearningState<GameConfig>> {
+        val flow = getOrCreateGameConfigState(gameId)
+        repositoryScope.launch { ensureGameConfigInitialized(gameId) }
+        return flow.asStateFlow()
+    }
+
+    override suspend fun refreshGameConfig(gameId: String): Result<Unit> {
+        val flow = getOrCreateGameConfigState(gameId)
+        val jobToAwait = gameConfigRefreshMutex.withLock {
+            gameConfigInFlight[gameId]?.let { return@withLock it }
+            val deferred = repositoryScope.async {
+                try {
+                    val result = remoteDataSource.fetchGameConfig(gameId)
+                    result.onSuccess { config ->
+                        flow.value = LearningState.Fresh(config)
+                        try { cacheStorage.saveGameConfig(gameId, config) } catch (_: Exception) {}
+                    }.onFailure { exception ->
+                        val cached = try { cacheStorage.loadGameConfig(gameId) } catch (_: Exception) { null }
+                        if (cached != null) {
+                            flow.value = LearningState.Offline(cached, exception.message)
+                        } else {
+                            flow.value = LearningState.Error(exception.message ?: "Failed to load game config", null)
+                        }
+                    }
+                    result.map { }
+                } finally {
+                    gameConfigRefreshMutex.withLock { gameConfigInFlight.remove(gameId) }
+                }
+            }
+            gameConfigInFlight[gameId] = deferred
+            deferred
         }
+        return jobToAwait.await()
+    }
+
+    override fun getGameLevelsState(gameId: String): Flow<LearningState<List<GameLevel>>> {
+        val flow = getOrCreateGameLevelState(gameId)
+        repositoryScope.launch { ensureGameLevelsInitialized(gameId) }
+        return flow.asStateFlow()
+    }
+
+    override suspend fun refreshGameLevels(gameId: String): Result<Unit> {
+        val flow = getOrCreateGameLevelState(gameId)
+        val jobToAwait = gameLevelRefreshMutex.withLock {
+            gameLevelInFlight[gameId]?.let { return@withLock it }
+            val deferred = repositoryScope.async {
+                try {
+                    val result = remoteDataSource.fetchGameLevels(gameId)
+                    result.onSuccess { levels ->
+                        val published = levels.filter { it.isPublished }
+                        flow.value = LearningState.Fresh(published)
+                        try { cacheStorage.saveGameLevels(gameId, published) } catch (_: Exception) {}
+                    }.onFailure { exception ->
+                        val cached = try { cacheStorage.loadGameLevels(gameId) } catch (_: Exception) { emptyList() }
+                        if (cached.isNotEmpty()) {
+                            flow.value = LearningState.Offline(cached, exception.message)
+                        } else {
+                            flow.value = LearningState.Error(exception.message ?: "Failed to load game levels", null)
+                        }
+                    }
+                    result.map { }
+                } finally {
+                    gameLevelRefreshMutex.withLock { gameLevelInFlight.remove(gameId) }
+                }
+            }
+            gameLevelInFlight[gameId] = deferred
+            deferred
+        }
+        return jobToAwait.await()
+    }
+
+    override suspend fun saveGameProgress(progress: GameProgress) {
+        try {
+            cacheStorage.saveGameProgress(progress)
+        } catch (e: Exception) {
+            println("LearningRepository: Failed to save game progress: ${e.message}")
+        }
+    }
+
+    override suspend fun getGameProgress(childId: String, gameId: String, levelId: String?): GameProgress? {
+        return try {
+            cacheStorage.loadGameProgress(childId, gameId, levelId)
+        } catch (e: Exception) {
+            println("LearningRepository: Failed to load game progress: ${e.message}")
+            null
+        }
+    }
+
+    override fun preloadSubcategories(explorerId: String) {
+        repositoryScope.launch { ensureSubcategoriesInitialized(explorerId) }
     }
 
     override fun preloadGames(subcategoryId: String) {
-        repositoryScope.launch {
-            ensureGamesInitialized(subcategoryId)
-        }
+        repositoryScope.launch { ensureGamesInitialized(subcategoryId) }
     }
 
     override fun preloadGamesForExplorer(explorerId: String) {
-        repositoryScope.launch {
-            ensureExplorerGamesInitialized(explorerId)
-        }
+        repositoryScope.launch { ensureExplorerGamesInitialized(explorerId) }
     }
 
     override fun preloadQuestions(subcategoryId: String, gameId: String) {
-        repositoryScope.launch {
-            ensureQuestionsInitialized(subcategoryId, gameId)
-        }
+        repositoryScope.launch { ensureQuestionsInitialized(subcategoryId, gameId) }
     }
 }

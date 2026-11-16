@@ -1,6 +1,9 @@
 package com.hathway.sproutelle.data.datasource
 
+import com.hathway.sproutelle.domain.model.GameConfig
 import com.hathway.sproutelle.domain.model.GameItem
+import com.hathway.sproutelle.domain.model.GameLevel
+import com.hathway.sproutelle.domain.model.GameProgress
 import com.hathway.sproutelle.domain.model.Question
 import com.hathway.sproutelle.domain.model.Subcategory
 import com.hathway.sproutelle.domain.model.SubcategoryWithGames
@@ -21,6 +24,15 @@ interface LearningCacheStorage {
     suspend fun saveQuestions(subcategoryId: String, gameId: String, items: List<Question>)
     suspend fun loadQuestions(subcategoryId: String, gameId: String): List<Question>
     fun loadQuestionsSync(subcategoryId: String, gameId: String): List<Question>
+
+    suspend fun saveGameConfig(gameId: String, config: GameConfig)
+    suspend fun loadGameConfig(gameId: String): GameConfig?
+
+    suspend fun saveGameLevels(gameId: String, levels: List<GameLevel>)
+    suspend fun loadGameLevels(gameId: String): List<GameLevel>
+
+    suspend fun saveGameProgress(progress: GameProgress)
+    suspend fun loadGameProgress(childId: String, gameId: String, levelId: String?): GameProgress?
 }
 
 expect class LearningCache() : LearningCacheStorage {
@@ -39,4 +51,13 @@ expect class LearningCache() : LearningCacheStorage {
     override suspend fun saveQuestions(subcategoryId: String, gameId: String, items: List<Question>)
     override suspend fun loadQuestions(subcategoryId: String, gameId: String): List<Question>
     override fun loadQuestionsSync(subcategoryId: String, gameId: String): List<Question>
+
+    override suspend fun saveGameConfig(gameId: String, config: GameConfig)
+    override suspend fun loadGameConfig(gameId: String): GameConfig?
+
+    override suspend fun saveGameLevels(gameId: String, levels: List<GameLevel>)
+    override suspend fun loadGameLevels(gameId: String): List<GameLevel>
+
+    override suspend fun saveGameProgress(progress: GameProgress)
+    override suspend fun loadGameProgress(childId: String, gameId: String, levelId: String?): GameProgress?
 }

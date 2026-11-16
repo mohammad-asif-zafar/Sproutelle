@@ -1,6 +1,9 @@
 package com.hathway.sproutelle.domain.repository
 
+import com.hathway.sproutelle.domain.model.GameConfig
 import com.hathway.sproutelle.domain.model.GameItem
+import com.hathway.sproutelle.domain.model.GameLevel
+import com.hathway.sproutelle.domain.model.GameProgress
 import com.hathway.sproutelle.domain.model.Question
 import com.hathway.sproutelle.domain.model.Subcategory
 import com.hathway.sproutelle.domain.model.SubcategoryWithGames
@@ -30,6 +33,15 @@ interface LearningRepository {
     fun getQuestions(subcategoryId: String, gameId: String): Flow<List<Question>>
     fun getQuestionsState(subcategoryId: String, gameId: String): Flow<LearningState<List<Question>>>
     suspend fun refreshQuestions(subcategoryId: String, gameId: String): Result<Unit>
+
+    fun getGameConfigState(gameId: String): Flow<LearningState<GameConfig>>
+    suspend fun refreshGameConfig(gameId: String): Result<Unit>
+
+    fun getGameLevelsState(gameId: String): Flow<LearningState<List<GameLevel>>>
+    suspend fun refreshGameLevels(gameId: String): Result<Unit>
+
+    suspend fun saveGameProgress(progress: GameProgress)
+    suspend fun getGameProgress(childId: String, gameId: String, levelId: String?): GameProgress?
 
     fun preloadSubcategories(explorerId: String)
     fun preloadGames(subcategoryId: String)

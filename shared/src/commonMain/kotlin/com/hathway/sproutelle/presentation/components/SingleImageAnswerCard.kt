@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -167,8 +168,20 @@ fun SingleImageAnswerCard(
                                 .background(borderColor.copy(alpha = 0.12f))
                         )
                     }
+                } else if (pictureEmoji == "🖼️" && option.text.isNotBlank()) {
+                    // Text Word Option Mode (e.g., Object Identification / Category Identification)
+                    Text(
+                        text = option.text,
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontSize = if (isTablet) 20.sp else 16.sp
+                        ),
+                        color = Color(0xFF0D47A1),
+                        fontWeight = FontWeight.Black,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    )
                 } else {
-                    // Development/Fallback Mode: Delivers rich large toy emojis when URLs are absent or broken
+                    // Emoji / Illustration Fallback Mode
                     Text(
                         text = pictureEmoji,
                         fontSize = emojiSize

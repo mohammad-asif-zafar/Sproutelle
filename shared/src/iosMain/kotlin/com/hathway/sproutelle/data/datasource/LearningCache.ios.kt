@@ -1,6 +1,9 @@
 package com.hathway.sproutelle.data.datasource
 
+import com.hathway.sproutelle.domain.model.GameConfig
 import com.hathway.sproutelle.domain.model.GameItem
+import com.hathway.sproutelle.domain.model.GameLevel
+import com.hathway.sproutelle.domain.model.GameProgress
 import com.hathway.sproutelle.domain.model.Question
 import com.hathway.sproutelle.domain.model.Subcategory
 import com.hathway.sproutelle.domain.model.SubcategoryWithGames
@@ -98,6 +101,41 @@ actual class LearningCache : LearningCacheStorage {
         } catch (e: Exception) {
             emptyList()
         }
+    }
+
+    @OptIn(ExperimentalForeignApi::class, kotlinx.cinterop.BetaInteropApi::class)
+    actual override suspend fun saveGameConfig(gameId: String, config: GameConfig) {
+        saveStringToFile("sproutelle_config_${gameId}.json", json.encodeToString(config))
+    }
+
+    @OptIn(ExperimentalForeignApi::class)
+    actual override suspend fun loadGameConfig(gameId: String): GameConfig? {
+        val content = loadStringFromFile("sproutelle_config_${gameId}.json") ?: return null
+        return try { json.decodeFromString<GameConfig>(content) } catch (_: Exception) { null }
+    }
+
+    @OptIn(ExperimentalForeignApi::class, kotlinx.cinterop.BetaInteropApi::class)
+    actual override suspend fun saveGameLevels(gameId: String, levels: List<GameLevel>) {
+        saveStringToFile("sproutelle_levels_${gameId}.json", json.encodeToString(levels))
+    }
+
+    @OptIn(ExperimentalForeignApi::class)
+    actual override suspend fun loadGameLevels(gameId: String): List<GameLevel> {
+        val content = loadStringFromFile("sproutelle_levels_${gameId}.json") ?: return emptyList()
+        return try { json.decodeFromString<List<GameLevel>>(content) } catch (_: Exception) { emptyList() }
+    }
+
+    @OptIn(ExperimentalForeignApi::class, kotlinx.cinterop.BetaInteropApi::class)
+    actual override suspend fun saveGameProgress(progress: GameProgress) {
+        val fileName = "sproutelle_progress_${progress.childId}_${progress.gameId}_${progress.levelId ?: "default"}.json"
+        saveStringToFile(fileName, json.encodeToString(progress))
+    }
+
+    @OptIn(ExperimentalForeignApi::class)
+    actual override suspend fun loadGameProgress(childId: String, gameId: String, levelId: String?): GameProgress? {
+        val fileName = "sproutelle_progress_${childId}_${gameId}_${levelId ?: "default"}.json"
+        val content = loadStringFromFile(fileName) ?: return null
+        return try { json.decodeFromString<GameProgress>(content) } catch (_: Exception) { null }
     }
 
     @OptIn(ExperimentalForeignApi::class, kotlinx.cinterop.BetaInteropApi::class)

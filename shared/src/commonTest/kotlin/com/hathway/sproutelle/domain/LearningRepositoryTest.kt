@@ -5,7 +5,10 @@ import com.hathway.sproutelle.data.datasource.LearningRemoteDataSource
 import com.hathway.sproutelle.data.model.GameEntity
 import com.hathway.sproutelle.data.model.SubcategoryGameEntity
 import com.hathway.sproutelle.data.repository.LearningRepositoryImpl
+import com.hathway.sproutelle.domain.model.GameConfig
 import com.hathway.sproutelle.domain.model.GameItem
+import com.hathway.sproutelle.domain.model.GameLevel
+import com.hathway.sproutelle.domain.model.GameProgress
 import com.hathway.sproutelle.domain.model.Question
 import com.hathway.sproutelle.domain.model.QuestionOption
 import com.hathway.sproutelle.domain.model.Subcategory
@@ -24,7 +27,9 @@ class LearningRepositoryTest {
         var subcategoriesToReturn: Map<String, Result<List<Subcategory>>> = emptyMap(),
         var gamesToReturn: Map<String, Result<List<GameItem>>> = emptyMap(),
         var gamesForExplorerToReturn: Map<String, Result<List<SubcategoryWithGames>>> = emptyMap(),
-        var questionsToReturn: Map<String, Result<List<Question>>> = emptyMap()
+        var questionsToReturn: Map<String, Result<List<Question>>> = emptyMap(),
+        var configToReturn: Map<String, Result<GameConfig>> = emptyMap(),
+        var levelsToReturn: Map<String, Result<List<GameLevel>>> = emptyMap()
     ) : LearningRemoteDataSource {
         var subcategoryFetchCount = 0
         var gameFetchCount = 0
@@ -51,6 +56,14 @@ class LearningRepositoryTest {
             val key = "${subcategoryId}_${gameId}"
             return questionsToReturn[key] ?: Result.success(emptyList())
         }
+
+        override suspend fun fetchGameConfig(gameId: String): Result<GameConfig> {
+            return configToReturn[gameId] ?: Result.success(GameConfig(gameId = gameId, name = "Test Game"))
+        }
+
+        override suspend fun fetchGameLevels(gameId: String): Result<List<GameLevel>> {
+            return levelsToReturn[gameId] ?: Result.success(emptyList())
+        }
     }
 
     private class FakeLearningCacheStorage(
@@ -63,6 +76,9 @@ class LearningRepositoryTest {
         val storedGames = initialGames.toMutableMap()
         val storedExplorerGames = initialExplorerGames.toMutableMap()
         val storedQuestions = initialQuestions.toMutableMap()
+        val storedConfigs = mutableMapOf<String, GameConfig>()
+        val storedLevels = mutableMapOf<String, List<GameLevel>>()
+        val storedProgress = mutableMapOf<String, GameProgress>()
 
         override suspend fun saveSubcategories(explorerId: String, items: List<Subcategory>) {
             storedSubcategories[explorerId] = items
@@ -110,6 +126,30 @@ class LearningRepositoryTest {
 
         override fun loadQuestionsSync(subcategoryId: String, gameId: String): List<Question> {
             return storedQuestions["${subcategoryId}_${gameId}"] ?: emptyList()
+        }
+
+        override suspend fun saveGameConfig(gameId: String, config: GameConfig) {
+            storedConfigs[gameId] = config
+        }
+
+        override suspend fun loadGameConfig(gameId: String): GameConfig? {
+            return storedConfigs[gameId]
+        }
+
+        override suspend fun saveGameLevels(gameId: String, levels: List<GameLevel>) {
+            storedLevels[gameId] = levels
+        }
+
+        override suspend fun loadGameLevels(gameId: String): List<GameLevel> {
+            return storedLevels[gameId] ?: emptyList()
+        }
+
+        override suspend fun saveGameProgress(progress: GameProgress) {
+            storedProgress["${progress.childId}_${progress.gameId}_${progress.levelId ?: "default"}"] = progress
+        }
+
+        override suspend fun loadGameProgress(childId: String, gameId: String, levelId: String?): GameProgress? {
+            return storedProgress["${childId}_${gameId}_${levelId ?: "default"}"]
         }
     }
 
@@ -284,8 +324,8 @@ class LearningRepositoryTest {
         val sub1 = "sub_fruits"
         val sub2 = "sub_animals"
 
-        val qSub1 = listOf(Question("q_fruit", gameId, sub1, "Find Apple?", "quiz", null, 1, false))
-        val qSub2 = listOf(Question("q_animal", gameId, sub2, "Find Lion?", "quiz", null, 1, false))
+        val qSub1 = listOf(Question("q_fruit", gameId, sub1, null, "Find Apple?", "quiz", null, 1, false))
+        val qSub2 = listOf(Question("q_animal", gameId, sub2, null, "Find Lion?", "quiz", null, 1, false))
 
         val remote = FakeLearningRemoteDataSource(questionsToReturn = mapOf(
             "${sub1}_${gameId}" to Result.success(qSub1),
@@ -307,8 +347,8 @@ class LearningRepositoryTest {
         val gameId = "game_quiz"
 
         val questions = listOf(
-            Question("q_active", gameId, sub1, "Active Q", "quiz", null, 1, isDraft = false),
-            Question("q_draft", gameId, sub1, "Draft Q", "quiz", null, 2, isDraft = true)
+            Question("q_active", gameId, sub1, null, "Active Q", "quiz", null, 1, isDraft = false),
+            Question("q_draft", gameId, sub1, null, "Draft Q", "quiz", null, 2, isDraft = true)
         )
 
         val remote = FakeLearningRemoteDataSource(questionsToReturn = mapOf("${sub1}_${gameId}" to Result.success(questions)))
@@ -325,8 +365,8 @@ class LearningRepositoryTest {
         val sub1 = "sub_fruits"
         val gameId = "game_quiz"
 
-        val cached = listOf(Question("q_cached", gameId, sub1, "Cached Question?", "quiz", null, 1, false))
-        val fresh = listOf(Question("q_fresh", gameId, sub1, "Fresh Question?", "quiz", null, 1, false))
+        val cached = listOf(Question("q_cached", gameId, sub1, null, "Cached Question?", "quiz", null, 1, false))
+        val fresh = listOf(Question("q_fresh", gameId, sub1, null, "Fresh Question?", "quiz", null, 1, false))
 
         val cache = FakeLearningCacheStorage(initialQuestions = mapOf("${sub1}_${gameId}" to cached))
         val remote = FakeLearningRemoteDataSource(questionsToReturn = mapOf("${sub1}_${gameId}" to Result.success(fresh)))
@@ -344,7 +384,7 @@ class LearningRepositoryTest {
         val sub1 = "sub_fruits"
         val gameId = "game_quiz"
 
-        val cached = listOf(Question("q_cached", gameId, sub1, "Cached Question?", "quiz", null, 1, false))
+        val cached = listOf(Question("q_cached", gameId, sub1, null, "Cached Question?", "quiz", null, 1, false))
 
         val cache = FakeLearningCacheStorage(initialQuestions = mapOf("${sub1}_${gameId}" to cached))
         val remote = FakeLearningRemoteDataSource(questionsToReturn = mapOf("${sub1}_${gameId}" to Result.failure(Exception("Network offline"))))

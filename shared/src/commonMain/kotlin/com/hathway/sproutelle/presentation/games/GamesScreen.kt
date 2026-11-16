@@ -351,30 +351,41 @@ private val StudioRowPalettes = listOf(
         shadowRimColor = Color(0xFFE6C896),
         iconTileBg = Color(0xFFE1F5FE),
         fallbackEmoji = "🖼️"
-    ), GameRowPalette(
+    ),
+    GameRowPalette(
         containerColor = Color(0xFFF3EEFF), // Soft Lavender (Word Builder)
         borderColor = Color(0xFFD1C4E9),
         shadowRimColor = Color(0xFFB39DDB),
         iconTileBg = Color(0xFFEDE7F6),
         fallbackEmoji = "🔤"
-    ), GameRowPalette(
+    ),
+    GameRowPalette(
         containerColor = Color(0xFFE6F4FF), // Sky Blue (Match & Discover)
         borderColor = Color(0xFFB3E5FC),
         shadowRimColor = Color(0xFF81D4FA),
         iconTileBg = Color(0xFFE0F7FA),
         fallbackEmoji = "🍎"
-    ), GameRowPalette(
+    ),
+    GameRowPalette(
         containerColor = Color(0xFFFCEBF3), // Blush Pink (Picture Finder)
         borderColor = Color(0xFFF8BBD0),
         shadowRimColor = Color(0xFFF48FB1),
         iconTileBg = Color(0xFFFCE4EC),
         fallbackEmoji = "🎧"
-    ), GameRowPalette(
+    ),
+    GameRowPalette(
         containerColor = Color(0xFFE8F7EB), // Mint Green (Number Quest)
         borderColor = Color(0xFFC8E6C9),
         shadowRimColor = Color(0xFFA5D6A7),
         iconTileBg = Color(0xFFE8F5E9),
         fallbackEmoji = "🔢"
+    ),
+    GameRowPalette(
+        containerColor = Color(0xFFFFFDE7), // Soft Yellow (Addition Adventure)
+        borderColor = Color(0xFFFFF59D),
+        shadowRimColor = Color(0xFFFFE082),
+        iconTileBg = Color(0xFFFFF9C4),
+        fallbackEmoji = "➕"
     )
 )
 
@@ -382,7 +393,7 @@ private val StudioRowPalettes = listOf(
 private fun GameListRowCard(
     game: GameItem, index: Int, isTablet: Boolean, onClick: () -> Unit
 ) {
-// Staggered spring entrance animation
+    // Staggered spring entrance animation
     val entranceScale = remember(game.assignmentId, game.gameId) { Animatable(0.88f) }
     LaunchedEffect(game.assignmentId, game.gameId) {
         delay(index * 55L)
@@ -401,8 +412,12 @@ private fun GameListRowCard(
         ), label = "GameRowPressScale"
     )
     val palette = StudioRowPalettes[index % StudioRowPalettes.size]
-    val cardHeight = if (isTablet) 96.dp else 82.dp
+    val cardHeight = if (isTablet) 102.dp else 88.dp
+    val iconTileSize = if (isTablet) 74.dp else 64.dp
+    val playButtonSize = if (isTablet) 54.dp else 48.dp
+    val playIconSize = if (isTablet) 32.dp else 28.dp
     val cornerRadius = if (isTablet) 28.dp else 24.dp
+
     val ageLabel = remember(game.minAge, game.maxAge) {
         val min = game.minAge ?: 3
         val max = game.maxAge ?: 8
@@ -419,37 +434,49 @@ private fun GameListRowCard(
             else -> palette.fallbackEmoji
         }
     }
+
     Box(
-        modifier = Modifier.fillMaxWidth().height(cardHeight + 4.dp).graphicsLayer {
-            val combined = entranceScale.value * pressScale
-            scaleX = combined
-            scaleY = combined
-        }.clickable(
-            interactionSource = interactionSource, indication = null, onClick = onClick
-        )
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(cardHeight + 4.dp)
+            .graphicsLayer {
+                val combined = entranceScale.value * pressScale
+                scaleX = combined
+                scaleY = combined
+            }
+            .clickable(
+                interactionSource = interactionSource, indication = null, onClick = onClick
+            )
     ) {
-// 3D Bottom Rim Shadow
+        // 3D Bottom Rim Shadow
         Box(
-            modifier = Modifier.fillMaxWidth().height(cardHeight).offset(y = 4.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(cardHeight)
+                .offset(y = 4.dp)
                 .background(palette.shadowRimColor, shape = RoundedCornerShape(cornerRadius))
         )
-// Foreground Pastel Pill Card
+
+        // Foreground Pastel Pill Card
         Surface(
-            modifier = Modifier.fillMaxWidth().height(cardHeight),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(cardHeight),
             shape = RoundedCornerShape(cornerRadius),
             color = palette.containerColor,
             border = BorderStroke(2.dp, palette.borderColor),
             shadowElevation = 2.dp
         ) {
             Row(
-                modifier = Modifier.fillMaxSize()
-                    .padding(horizontal = if (isTablet) 16.dp else 12.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = if (isTablet) 18.dp else 14.dp, vertical = if (isTablet) 14.dp else 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(if (isTablet) 16.dp else 12.dp)
+                horizontalArrangement = Arrangement.spacedBy(if (isTablet) 18.dp else 14.dp)
             ) {
-// Left Rounded Icon Tile
+                // Left Rounded Icon Tile - 10-15% increased size while preserving aspect ratio
                 Surface(
-                    modifier = Modifier.size(if (isTablet) 64.dp else 56.dp),
+                    modifier = Modifier.size(iconTileSize),
                     shape = RoundedCornerShape(18.dp),
                     color = palette.iconTileBg,
                     border = BorderStroke(2.dp, Color.White),
@@ -467,7 +494,9 @@ private fun GameListRowCard(
                                 Image(
                                     painter = painterResource(localDrawable),
                                     contentDescription = game.name,
-                                    modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)),
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(RoundedCornerShape(16.dp)),
                                     contentScale = ContentScale.Fit
                                 )
                             }
@@ -475,7 +504,9 @@ private fun GameListRowCard(
                                 AsyncImage(
                                     model = iconUrl,
                                     contentDescription = game.name,
-                                    modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)),
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(RoundedCornerShape(16.dp)),
                                     contentScale = ContentScale.Fit,
                                     onError = { imageLoadFailed = true }
                                 )
@@ -483,71 +514,84 @@ private fun GameListRowCard(
                             else -> {
                                 Text(
                                     text = badgeEmoji,
-                                    fontSize = if (isTablet) 32.sp else 28.sp
+                                    fontSize = if (isTablet) 36.sp else 30.sp
                                 )
                             }
                         }
                     }
                 }
-// Center Title + Age Range Pill
+
+                // Center Title + Age Range Pill
                 Column(
-                    modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Text(
                         text = game.name,
                         style = MaterialTheme.typography.titleMedium.copy(
-                            fontSize = if (isTablet) 20.sp else 17.sp
+                            fontSize = if (isTablet) 22.sp else 18.sp
                         ),
                         color = Color(0xFF1B365D),
                         fontWeight = FontWeight.Black,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+
                     Surface(
                         shape = RoundedCornerShape(50.dp),
-                        color = Color.White.copy(alpha = 0.85f),
+                        color = Color.White.copy(alpha = 0.88f),
                         border = BorderStroke(1.dp, palette.borderColor)
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 2.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Text(text = "👥", fontSize = 11.sp)
                             Text(
-                                text = ageLabel, style = MaterialTheme.typography.labelSmall.copy(
-                                    fontSize = if (isTablet) 13.sp else 11.sp
-                                ), color = Color(0xFF37474F), fontWeight = FontWeight.Bold
+                                text = ageLabel,
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontSize = if (isTablet) 14.sp else 12.sp
+                                ),
+                                color = Color(0xFF37474F),
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }
                 }
-// Right Glossy 3D Green Play Button
+
+                // Right Glossy 3D Green Play Button
                 Box(
-                    modifier = Modifier.size(if (isTablet) 52.dp else 46.dp),
+                    modifier = Modifier.size(playButtonSize),
                     contentAlignment = Alignment.Center
                 ) {
-// Darker green bottom rim
+                    // Darker green bottom rim
                     Box(
-                        modifier = Modifier.fillMaxSize().offset(y = 2.5.dp)
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .offset(y = 2.5.dp)
                             .background(Color(0xFF2E7D32), CircleShape)
                     )
-// Glossy gradient green disc
+                    // Glossy gradient green disc
                     Box(
-                        modifier = Modifier.fillMaxSize().background(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(
-                                    Color(0xFF81C784), Color(0xFF43A047)
-                                )
-                            ), shape = CircleShape
-                        ).border(2.dp, Color.White, CircleShape),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                brush = Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color(0xFF81C784), Color(0xFF43A047)
+                                    )
+                                ),
+                                shape = CircleShape
+                            )
+                            .border(2.dp, Color.White, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.PlayArrow,
                             contentDescription = "Play ${game.name}",
                             tint = Color.White,
-                            modifier = Modifier.size(if (isTablet) 30.dp else 26.dp)
+                            modifier = Modifier.size(playIconSize)
                         )
                     }
                 }

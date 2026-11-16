@@ -12,5 +12,6 @@ data class QuestionOption(
     val imageAssetId: String? = null,
     val audioAssetId: String? = null,
     val imageUrl: String? = null,
-    val audioUrl: String? = null
+    val audioUrl: String? = null,
+    val explanation: String? = null
 )

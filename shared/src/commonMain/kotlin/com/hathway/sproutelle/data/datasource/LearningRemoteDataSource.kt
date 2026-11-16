@@ -1,12 +1,16 @@
 package com.hathway.sproutelle.data.datasource
 
+import com.hathway.sproutelle.data.model.GameConfigEntity
 import com.hathway.sproutelle.data.model.GameEntity
+import com.hathway.sproutelle.data.model.GameLevelEntity
 import com.hathway.sproutelle.data.model.MediaAssetEntity
 import com.hathway.sproutelle.data.model.QuestionEntity
 import com.hathway.sproutelle.data.model.QuestionOptionEntity
 import com.hathway.sproutelle.data.model.SubcategoryEntity
 import com.hathway.sproutelle.data.model.SubcategoryGameEntity
+import com.hathway.sproutelle.domain.model.GameConfig
 import com.hathway.sproutelle.domain.model.GameItem
+import com.hathway.sproutelle.domain.model.GameLevel
 import com.hathway.sproutelle.domain.model.Question
 import com.hathway.sproutelle.domain.model.Subcategory
 import com.hathway.sproutelle.domain.model.SubcategoryWithGames
@@ -28,6 +32,8 @@ interface LearningRemoteDataSource {
     suspend fun fetchGamesForSubcategory(subcategoryId: String): Result<List<GameItem>>
     suspend fun fetchGamesForExplorer(explorerId: String): Result<List<SubcategoryWithGames>>
     suspend fun fetchQuestions(subcategoryId: String, gameId: String): Result<List<Question>>
+    suspend fun fetchGameConfig(gameId: String): Result<GameConfig>
+    suspend fun fetchGameLevels(gameId: String): Result<List<GameLevel>>
 }
 
 class SupabaseLearningRemoteDataSource(
@@ -40,6 +46,49 @@ class SupabaseLearningRemoteDataSource(
         }
     }
 ) : LearningRemoteDataSource {
+
+    override suspend fun fetchGameConfig(gameId: String): Result<GameConfig> {
+        return try {
+            val configUrl = "${SupabaseConfig.SUPABASE_URL}/rest/v1/games?id=eq.$gameId&is_published=eq.true"
+            val response: HttpResponse = client.get(configUrl) {
+                header("apikey", SupabaseConfig.SUPABASE_ANON_KEY)
+                header(HttpHeaders.Authorization, "Bearer ${SupabaseConfig.SUPABASE_ANON_KEY}")
+                header(HttpHeaders.Accept, "application/json")
+            }
+
+            if (response.status.value !in 200..299) {
+                return Result.failure(Exception("Failed to fetch game config: HTTP ${response.status.value}"))
+            }
+
+            val gameConfigs: List<GameConfigEntity> = response.body()
+            val configEntity = gameConfigs.firstOrNull()
+                ?: return Result.failure(Exception("Game config not found for id $gameId"))
+
+            Result.success(configEntity.toDomain())
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun fetchGameLevels(gameId: String): Result<List<GameLevel>> {
+        return try {
+            val levelsUrl = "${SupabaseConfig.SUPABASE_URL}/rest/v1/game_levels?game_id=eq.$gameId&is_published=eq.true&order=level_number.asc"
+            val response: HttpResponse = client.get(levelsUrl) {
+                header("apikey", SupabaseConfig.SUPABASE_ANON_KEY)
+                header(HttpHeaders.Authorization, "Bearer ${SupabaseConfig.SUPABASE_ANON_KEY}")
+                header(HttpHeaders.Accept, "application/json")
+            }
+
+            if (response.status.value !in 200..299) {
+                return Result.success(emptyList())
+            }
+
+            val levelEntities: List<GameLevelEntity> = response.body()
+            Result.success(levelEntities.map { it.toDomain() })
+        } catch (_: Exception) {
+            Result.success(emptyList())
+        }
+    }
 
     override suspend fun fetchSubcategories(explorerId: String): Result<List<Subcategory>> {
         return try {
@@ -63,74 +112,8 @@ class SupabaseLearningRemoteDataSource(
             val subcategoryEntities: List<SubcategoryEntity> = jsonParser.decodeFromString(responseText)
 
             val assetIds = subcategoryEntities.mapNotNull { it.imageAssetId }.distinct()
-            val mediaMap = if (assetIds.isNotEmpty()) {
-                val idsParam = assetIds.joinToString(",")
-                val mediaUrl = "${SupabaseConfig.SUPABASE_URL}/rest/v1/media_assets?id=in.($idsParam)&select=id,name,bucket_name,file_path,mime_type,size_bytes,checksum_sha256,created_by,created_at"
-                try {
-                    val mediaResponse: HttpResponse = client.get(mediaUrl) {
-                        header("apikey", SupabaseConfig.SUPABASE_ANON_KEY)
-                        header(HttpHeaders.Authorization, "Bearer ${SupabaseConfig.SUPABASE_ANON_KEY}")
-                        header(HttpHeaders.Accept, "application/json")
-                    }
-                    if (mediaResponse.status.value in 200..299) {
-                        val mediaList: List<MediaAssetEntity> = mediaResponse.body()
-                        mediaList.associateBy { it.id }
-                    } else {
-                        emptyMap()
-                    }
-                } catch (_: Exception) {
-                    emptyMap()
-                }
-            } else {
-                emptyMap()
-            }
-
-            val pathsByBucket = mutableMapOf<String, MutableList<String>>()
-            subcategoryEntities.forEach { entity ->
-                val asset = entity.imageAssetId?.let { mediaMap[it] }
-                val bucketName = asset?.bucketName ?: "game-assets"
-                val filePath = asset?.filePath
-                if (!bucketName.isBlank() && !filePath.isNullOrBlank()) {
-                    pathsByBucket.getOrPut(bucketName) { mutableListOf() }.add(filePath)
-                }
-            }
-
-            val signedUrlMap = mutableMapOf<String, String>()
-
-            for ((bucketName, paths) in pathsByBucket) {
-                try {
-                    val signUrl = "${SupabaseConfig.SUPABASE_URL}/storage/v1/object/sign/$bucketName"
-                    val signResponse: HttpResponse = client.post(signUrl) {
-                        header("apikey", SupabaseConfig.SUPABASE_ANON_KEY)
-                        header(HttpHeaders.Authorization, "Bearer ${SupabaseConfig.SUPABASE_ANON_KEY}")
-                        header(HttpHeaders.ContentType, "application/json")
-                        setBody(SignRequest(expiresIn = 86400, paths = paths))
-                    }
-                    if (signResponse.status.value in 200..299) {
-                        val bodyText = signResponse.bodyAsText()
-                        val responses = try {
-                            jsonParser.decodeFromString<List<SignedUrlResponse>>(bodyText)
-                        } catch (_: Exception) {
-                            listOf(jsonParser.decodeFromString<SignedUrlResponse>(bodyText))
-                        }
-                        responses.forEach { resp ->
-                            val path = resp.path ?: resp.signedURL?.substringAfterLast("/")
-                            val sUrl = resp.signedURL
-                            if (!path.isNullOrBlank() && !sUrl.isNullOrBlank()) {
-                                val fullUrl = when {
-                                    sUrl.startsWith("http") -> sUrl
-                                    sUrl.startsWith("/storage/v1") -> "${SupabaseConfig.SUPABASE_URL}$sUrl"
-                                    sUrl.startsWith("/") -> "${SupabaseConfig.SUPABASE_URL}/storage/v1$sUrl"
-                                    else -> "${SupabaseConfig.SUPABASE_URL}/storage/v1/$sUrl"
-                                }
-                                signedUrlMap[path] = fullUrl
-                            }
-                        }
-                    }
-                } catch (_: Exception) {
-                    // Ignore signing errors
-                }
-            }
+            val mediaMap = fetchMediaAssets(assetIds)
+            val signedUrlMap = createSignedUrls(mediaMap.values.toList())
 
             val domainItems = subcategoryEntities.map { entity ->
                 val asset = entity.imageAssetId?.let { mediaMap[it] }
@@ -274,30 +257,137 @@ class SupabaseLearningRemoteDataSource(
             if (questionIds.isNotEmpty()) {
                 val idsParam = questionIds.joinToString(",")
                 val optionsUrl = "${SupabaseConfig.SUPABASE_URL}/rest/v1/question_options?question_id=in.($idsParam)&order=sort_order.asc"
-                try {
-                    val optionsResponse: HttpResponse = client.get(optionsUrl) {
-                        header("apikey", SupabaseConfig.SUPABASE_ANON_KEY)
-                        header(HttpHeaders.Authorization, "Bearer ${SupabaseConfig.SUPABASE_ANON_KEY}")
-                        header(HttpHeaders.Accept, "application/json")
-                    }
-                    if (optionsResponse.status.value in 200..299) {
-                        val optionEntities: List<QuestionOptionEntity> = optionsResponse.body()
-                        val grouped = optionEntities.groupBy { it.questionId }
-                        optionsMap.putAll(grouped)
-                    }
-                } catch (_: Exception) {
-                    // Ignore options query RLS or network error
+                val optionsResponse: HttpResponse = client.get(optionsUrl) {
+                    header("apikey", SupabaseConfig.SUPABASE_ANON_KEY)
+                    header(HttpHeaders.Authorization, "Bearer ${SupabaseConfig.SUPABASE_ANON_KEY}")
+                    header(HttpHeaders.Accept, "application/json")
+                }
+                if (optionsResponse.status.value in 200..299) {
+                    val optionEntities: List<QuestionOptionEntity> = optionsResponse.body()
+                    val grouped = optionEntities.groupBy { it.questionId }
+                    optionsMap.putAll(grouped)
+                } else {
+                    return Result.failure(Exception("Failed to fetch question options: HTTP ${optionsResponse.status.value}"))
                 }
             }
 
+            val allAssetIds = mutableListOf<String>()
+            questionEntities.forEach { q ->
+                q.imageAssetId?.let { allAssetIds.add(it) }
+                q.questionIllustrationAssetId?.let { allAssetIds.add(it) }
+                q.audioAssetId?.let { allAssetIds.add(it) }
+            }
+            optionsMap.values.flatten().forEach { opt ->
+                (opt.mediaAssetId ?: opt.imageAssetId)?.let { allAssetIds.add(it) }
+                opt.audioAssetId?.let { allAssetIds.add(it) }
+            }
+
+            val mediaMap = fetchMediaAssets(allAssetIds.distinct())
+            val signedUrlMap = createSignedUrls(mediaMap.values.toList())
+
             val domainQuestions = questionEntities.map { qEntity ->
-                val opts = optionsMap[qEntity.id]?.map { optEntity -> optEntity.toDomain() } ?: emptyList()
-                qEntity.toDomain(options = opts)
+                val opts = optionsMap[qEntity.id]?.map { optEntity ->
+                    val effectiveImageId = optEntity.mediaAssetId ?: optEntity.imageAssetId
+                    val optAsset = effectiveImageId?.let { mediaMap[it] }
+                    val optImageUrl = optAsset?.filePath?.let { signedUrlMap[it] }
+
+                    val optAudioAsset = optEntity.audioAssetId?.let { mediaMap[it] }
+                    val optAudioUrl = optAudioAsset?.filePath?.let { signedUrlMap[it] }
+
+                    optEntity.toDomain(imageUrl = optImageUrl, audioUrl = optAudioUrl)
+                } ?: emptyList()
+
+                val qAsset = qEntity.imageAssetId?.let { mediaMap[it] }
+                val qImageUrl = qAsset?.filePath?.let { signedUrlMap[it] }
+
+                val qIllusAsset = qEntity.questionIllustrationAssetId?.let { mediaMap[it] }
+                val qIllusUrl = qIllusAsset?.filePath?.let { signedUrlMap[it] }
+
+                val qAudioAsset = qEntity.audioAssetId?.let { mediaMap[it] }
+                val qAudioUrl = qAudioAsset?.filePath?.let { signedUrlMap[it] }
+
+                qEntity.toDomain(
+                    imageUrl = qImageUrl,
+                    audioUrl = qAudioUrl,
+                    questionIllustrationUrl = qIllusUrl,
+                    options = opts
+                )
             }
 
             Result.success(domainQuestions)
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    private suspend fun fetchMediaAssets(assetIds: List<String>): Map<String, MediaAssetEntity> {
+        if (assetIds.isEmpty()) return emptyMap()
+        val idsParam = assetIds.joinToString(",")
+        val mediaUrl = "${SupabaseConfig.SUPABASE_URL}/rest/v1/media_assets?id=in.($idsParam)&select=id,name,bucket_name,file_path,mime_type,size_bytes,checksum_sha256,created_by,created_at"
+        return try {
+            val mediaResponse: HttpResponse = client.get(mediaUrl) {
+                header("apikey", SupabaseConfig.SUPABASE_ANON_KEY)
+                header(HttpHeaders.Authorization, "Bearer ${SupabaseConfig.SUPABASE_ANON_KEY}")
+                header(HttpHeaders.Accept, "application/json")
+            }
+            if (mediaResponse.status.value in 200..299) {
+                val mediaList: List<MediaAssetEntity> = mediaResponse.body()
+                mediaList.associateBy { it.id }
+            } else {
+                emptyMap()
+            }
+        } catch (_: Exception) {
+            emptyMap()
+        }
+    }
+
+    private suspend fun createSignedUrls(assets: List<MediaAssetEntity>): Map<String, String> {
+        if (assets.isEmpty()) return emptyMap()
+        val jsonParser = Json { ignoreUnknownKeys = true; isLenient = true }
+        val pathsByBucket = mutableMapOf<String, MutableList<String>>()
+        assets.forEach { asset ->
+            val bucketName = asset.bucketName?.ifBlank { "game-assets" } ?: "game-assets"
+            val filePath = asset.filePath
+            if (!filePath.isNullOrBlank()) {
+                pathsByBucket.getOrPut(bucketName) { mutableListOf() }.add(filePath)
+            }
+        }
+
+        val signedUrlMap = mutableMapOf<String, String>()
+        for ((bucketName, paths) in pathsByBucket) {
+            try {
+                val signUrl = "${SupabaseConfig.SUPABASE_URL}/storage/v1/object/sign/$bucketName"
+                val signResponse: HttpResponse = client.post(signUrl) {
+                    header("apikey", SupabaseConfig.SUPABASE_ANON_KEY)
+                    header(HttpHeaders.Authorization, "Bearer ${SupabaseConfig.SUPABASE_ANON_KEY}")
+                    header(HttpHeaders.ContentType, "application/json")
+                    setBody(SignRequest(expiresIn = 86400, paths = paths))
+                }
+                if (signResponse.status.value in 200..299) {
+                    val bodyText = signResponse.bodyAsText()
+                    val responses = try {
+                        jsonParser.decodeFromString<List<SignedUrlResponse>>(bodyText)
+                    } catch (_: Exception) {
+                        listOf(jsonParser.decodeFromString<SignedUrlResponse>(bodyText))
+                    }
+                    responses.forEach { resp ->
+                        val path = resp.path ?: resp.signedURL?.substringAfterLast("/")
+                        val sUrl = resp.signedURL
+                        if (!path.isNullOrBlank() && !sUrl.isNullOrBlank()) {
+                            val fullUrl = when {
+                                sUrl.startsWith("http") -> sUrl
+                                sUrl.startsWith("/storage/v1") -> "${SupabaseConfig.SUPABASE_URL}$sUrl"
+                                sUrl.startsWith("/") -> "${SupabaseConfig.SUPABASE_URL}/storage/v1$sUrl"
+                                else -> "${SupabaseConfig.SUPABASE_URL}/storage/v1/$sUrl"
+                            }
+                            signedUrlMap[path] = fullUrl
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+                // Ignore signing errors
+            }
+        }
+        return signedUrlMap
     }
 }
