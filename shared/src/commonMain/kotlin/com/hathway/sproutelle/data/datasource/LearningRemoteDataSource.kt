@@ -277,9 +277,11 @@ class SupabaseLearningRemoteDataSource(
             questionEntities.forEach { q ->
                 q.imageAssetId?.let { allAssetIds.add(it) }
                 q.questionIllustrationAssetId?.let { allAssetIds.add(it) }
+                q.audioAssetId?.let { allAssetIds.add(it) }
             }
             optionsMap.values.flatten().forEach { opt ->
-                opt.imageAssetId?.let { allAssetIds.add(it) }
+                (opt.mediaAssetId ?: opt.imageAssetId)?.let { allAssetIds.add(it) }
+                opt.audioAssetId?.let { allAssetIds.add(it) }
             }
 
             val mediaMap = fetchMediaAssets(allAssetIds.distinct())
@@ -287,9 +289,14 @@ class SupabaseLearningRemoteDataSource(
 
             val domainQuestions = questionEntities.map { qEntity ->
                 val opts = optionsMap[qEntity.id]?.map { optEntity ->
-                    val optAsset = optEntity.imageAssetId?.let { mediaMap[it] }
+                    val effectiveMediaId = optEntity.mediaAssetId ?: optEntity.imageAssetId
+                    val optAsset = effectiveMediaId?.let { mediaMap[it] }
                     val optImageUrl = optAsset?.filePath?.let { signedUrlMap[it] }
-                    optEntity.toDomain(imageUrl = optImageUrl)
+
+                    val optAudioAsset = optEntity.audioAssetId?.let { mediaMap[it] }
+                    val optAudioUrl = optAudioAsset?.filePath?.let { signedUrlMap[it] }
+
+                    optEntity.toDomain(imageUrl = optImageUrl, audioUrl = optAudioUrl)
                 } ?: emptyList()
 
                 val qAsset = qEntity.imageAssetId?.let { mediaMap[it] }
@@ -298,8 +305,12 @@ class SupabaseLearningRemoteDataSource(
                 val qIllusAsset = qEntity.questionIllustrationAssetId?.let { mediaMap[it] }
                 val qIllusUrl = qIllusAsset?.filePath?.let { signedUrlMap[it] }
 
+                val qAudioAsset = qEntity.audioAssetId?.let { mediaMap[it] }
+                val qAudioUrl = qAudioAsset?.filePath?.let { signedUrlMap[it] }
+
                 qEntity.toDomain(
                     imageUrl = qImageUrl,
+                    audioUrl = qAudioUrl,
                     questionIllustrationUrl = qIllusUrl,
                     options = opts
                 )

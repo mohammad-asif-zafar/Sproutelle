@@ -3,6 +3,7 @@ package com.hathway.sproutelle.domain
 import com.hathway.sproutelle.data.datasource.LearningCacheStorage
 import com.hathway.sproutelle.data.datasource.LearningRemoteDataSource
 import com.hathway.sproutelle.data.model.GameEntity
+import com.hathway.sproutelle.data.model.QuestionOptionEntity
 import com.hathway.sproutelle.data.model.SubcategoryGameEntity
 import com.hathway.sproutelle.data.repository.LearningRepositoryImpl
 import com.hathway.sproutelle.domain.model.GameConfig
@@ -524,5 +525,120 @@ class LearningRepositoryTest {
         assertEquals(levelId, loaded.levelId)
         assertEquals(40, loaded.score)
         assertEquals("completed", loaded.completionStatus)
+    }
+
+    @Test
+    fun test18_MediaAssetIdMappingWhenImageAssetIdIsNull() {
+        val entity = QuestionOptionEntity(
+            id = "opt_1",
+            questionId = "q_1",
+            optionText = "Lemon",
+            isCorrect = true,
+            sortOrder = 1,
+            imageAssetId = null,
+            mediaAssetId = "5415ba68-08b1-47d3-bd1d-685d35f5107c"
+        )
+        val domain = entity.toDomain(imageUrl = "https://signed.url/lemon.png")
+        assertEquals("5415ba68-08b1-47d3-bd1d-685d35f5107c", domain.imageAssetId)
+        assertEquals("https://signed.url/lemon.png", domain.imageUrl)
+        assertEquals("Lemon", domain.text)
+        assertEquals(true, domain.isCorrect)
+    }
+
+    @Test
+    fun test19_LegacyImageAssetIdFallbackWhenMediaAssetIdIsNull() {
+        val entity = QuestionOptionEntity(
+            id = "opt_2",
+            questionId = "q_1",
+            optionText = "Apple",
+            isCorrect = false,
+            sortOrder = 2,
+            imageAssetId = "legacy-asset-id-123",
+            mediaAssetId = null
+        )
+        val domain = entity.toDomain(imageUrl = "https://signed.url/apple.png")
+        assertEquals("legacy-asset-id-123", domain.imageAssetId)
+        assertEquals("https://signed.url/apple.png", domain.imageUrl)
+    }
+
+    @Test
+    fun test20_PictureQuestLemonQuestionMultipleOptionsMapping(): Unit = runBlocking {
+        val gameId = "9e0aea7c-24a1-437b-89bd-11cd64b2d315"
+        val qId = "0947ac26-280c-4a53-9234-3bec4906e651"
+        val subId = "sub_fruits"
+
+        val lemonQuestion = Question(
+            id = qId,
+            gameId = gameId,
+            subcategoryId = subId,
+            text = "Which one is a Lemon?",
+            type = "find_correct_picture",
+            instructions = "Tap the lemon picture below",
+            sortOrder = 1,
+            isDraft = false,
+            options = listOf(
+                QuestionOption("opt_lemon_1", qId, "Lemon", true, 1, imageAssetId = "5415ba68-08b1-47d3-bd1d-685d35f5107c", imageUrl = "https://storage/lemon.png"),
+                QuestionOption("opt_lemon_2", qId, "Apple", false, 2, imageAssetId = "5415ba68-08b1-47d3-bd1d-685d35f5107c", imageUrl = "https://storage/apple.png"),
+                QuestionOption("opt_lemon_3", qId, "Banana", false, 3, imageAssetId = "42531a51-2b32-41ea-94fe-8576614b22b2", imageUrl = "https://storage/banana.png"),
+                QuestionOption("opt_lemon_4", qId, "Orange", false, 4, imageAssetId = "cba4fe6d-27ef-4b37-ad96-ef1c9cd8000c", imageUrl = "https://storage/orange.png")
+            )
+        )
+
+        val remote = FakeLearningRemoteDataSource(
+            questionsToReturn = mapOf("${subId}_${gameId}" to Result.success(listOf(lemonQuestion)))
+        )
+        val cache = FakeLearningCacheStorage()
+        val repository = LearningRepositoryImpl(remote, cache)
+
+        val questions = repository.getQuestions(subId, gameId).first { it.isNotEmpty() }
+        assertEquals(1, questions.size)
+        val q = questions[0]
+        assertEquals(4, q.options.size)
+        assertEquals("Lemon", q.options[0].text)
+        assertEquals(true, q.options[0].isCorrect)
+        assertEquals("https://storage/lemon.png", q.options[0].imageUrl)
+        assertEquals("https://storage/banana.png", q.options[2].imageUrl)
+        assertEquals("https://storage/orange.png", q.options[3].imageUrl)
+    }
+
+    @Test
+    fun test21_MissingMediaMetadataProducesGracefulNullImageUrl() {
+        val entity = QuestionOptionEntity(
+            id = "opt_missing",
+            questionId = "q_1",
+            optionText = "Unknown Fruit",
+            isCorrect = false,
+            sortOrder = 1,
+            mediaAssetId = "non-existent-media-id"
+        )
+        val domain = entity.toDomain(imageUrl = null)
+        assertEquals("non-existent-media-id", domain.imageAssetId)
+        assertEquals(null, domain.imageUrl)
+    }
+
+    @Test
+    fun test22_SignedUrlLookupFailureDoesNotCrash(): Unit = runBlocking {
+        val gameId = "game_signed_err"
+        val subId = "sub_1"
+        val question = Question(
+            id = "q_err",
+            gameId = gameId,
+            subcategoryId = subId,
+            text = "Test Question",
+            type = "find_correct_picture",
+            options = listOf(
+                QuestionOption("opt_err_1", "q_err", "Option A", true, 1, imageAssetId = "missing-asset-id", imageUrl = null)
+            )
+        )
+
+        val remote = FakeLearningRemoteDataSource(
+            questionsToReturn = mapOf("${subId}_${gameId}" to Result.success(listOf(question)))
+        )
+        val cache = FakeLearningCacheStorage()
+        val repository = LearningRepositoryImpl(remote, cache)
+
+        val loaded = repository.getQuestions(subId, gameId).first { it.isNotEmpty() }
+        assertEquals(1, loaded.size)
+        assertEquals(null, loaded[0].options[0].imageUrl)
     }
 }
